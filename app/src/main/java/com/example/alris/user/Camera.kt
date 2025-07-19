@@ -16,15 +16,12 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
@@ -37,18 +34,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -60,20 +54,16 @@ import coil.request.ImageRequest
 import com.example.alris.Constants
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.Dispatchers
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
 import java.io.IOException
-import java.text.SimpleDateFormat
-import java.util.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
 
 @Serializable
 data class ImagePayload(
@@ -85,7 +75,8 @@ data class ImagePayload(
 data class UploadPayload(
     val latitude: Double,
     val longitude: Double,
-    val images: List<ImagePayload>
+    val images: List<ImagePayload>,
+    val userId: String
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -163,20 +154,53 @@ fun MultiPhotoCameraScreen() {
             }
         })
     }
+    fun getUserDocumentId(onResult: (String?) -> Unit) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return onResult(null)
 
+        FirebaseFirestore.getInstance()
+            .collection("users")
+            .whereEqualTo("uid", uid)
+            .limit(1)
+            .get()
+            .addOnSuccessListener { documents ->
+                if (!documents.isEmpty) {
+                    val docId = documents.documents[0].id
+                    onResult(docId)
+                } else {
+                    onResult(null)
+                }
+            }
+            .addOnFailureListener {
+                onResult(null)
+            }
+    }
     fun uploadAllPhotos() {
         val currentLocation = location ?: return
-        coroutineScope.launch(Dispatchers.IO) {
-            uploadStatus = UploadStatus.Uploading
 
-            var allSuccess = true
-            uploadMultipleImagesAsJson(photoFiles, currentLocation.latitude, currentLocation.longitude) { success ->
-                if (!success) allSuccess = false
+        getUserDocumentId { userId ->
+            if (userId == null) {
+                uploadStatus = UploadStatus.Error("User document not found")
+                return@getUserDocumentId
             }
 
-            uploadStatus = if (allSuccess) UploadStatus.Success else UploadStatus.Error("One or more uploads failed")
+            coroutineScope.launch(Dispatchers.IO) {
+                uploadStatus = UploadStatus.Uploading
+
+                var allSuccess = true
+                uploadMultipleImagesAsJson(
+                    files = photoFiles,
+                    latitude = currentLocation.latitude,
+                    longitude = currentLocation.longitude,
+                    userId = userId  // ✅ Firestore document ID
+                ) { success ->
+                    if (!success) allSuccess = false
+                }
+
+                uploadStatus = if (allSuccess) UploadStatus.Success else UploadStatus.Error("One or more uploads failed")
+            }
         }
     }
+
 
     fun deletePhoto(index: Int) {
         photoFiles = photoFiles.toMutableList().also { it.removeAt(index) }
@@ -710,6 +734,7 @@ fun uploadMultipleImagesAsJson(
     files: List<File>,
     latitude: Double,
     longitude: Double,
+    userId: String, // <-- Add this parameter
     onComplete: (Boolean) -> Unit
 ) {
     val client = OkHttpClient()
@@ -717,7 +742,7 @@ fun uploadMultipleImagesAsJson(
     val images = files.mapNotNull { file ->
         if (file.exists()) {
             try {
-                val base64 = android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
+                val base64 = android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.DEFAULT)
                 ImagePayload(filename = file.name, base64 = base64)
             } catch (e: IOException) {
                 Log.e("UPLOAD", "Failed to read file: ${file.name}", e)
@@ -729,9 +754,14 @@ fun uploadMultipleImagesAsJson(
         }
     }
 
-    val payload = UploadPayload(latitude = latitude, longitude = longitude, images = images)
+    val payload = UploadPayload(
+        latitude = latitude,
+        longitude = longitude,
+        images = images,
+        userId = userId // <-- Include it in payload
+    )
 
-    val json = Json.encodeToString(payload)
+    val json = Json.encodeToString(UploadPayload.serializer(), payload)
     val requestBody = RequestBody.create("application/json".toMediaTypeOrNull(), json)
 
     val request = Request.Builder()

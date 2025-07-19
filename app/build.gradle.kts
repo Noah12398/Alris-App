@@ -3,16 +3,17 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.gms.google-services")
+    id("org.jetbrains.kotlin.plugin.compose") version "2.0.0" // ✅ NEW
 }
 
 android {
     namespace = "com.example.alris"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.alris"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -54,12 +55,17 @@ android {
         compose = true
     }
 
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.13"
-    }
+
 }
 
 dependencies {
+    // Supabase Kotlin SDK
+    implementation(platform("io.github.jan-tennert.supabase:bom:3.2.1"))
+    implementation("io.github.jan-tennert.supabase:auth-kt")       // for authentication
+    implementation("io.github.jan-tennert.supabase:postgrest-kt")  // for database
+    // … add other modules if you need them, like realtime-kt, storage-kt, etc.
+
+    implementation("io.ktor:ktor-client-android:3.2.1")  // Ktor engine
     // Firebase BoM (manages versioning)
     implementation(platform("com.google.firebase:firebase-bom:32.7.3"))
 

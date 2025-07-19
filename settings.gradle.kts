@@ -14,5 +14,6 @@ dependencyResolutionManagement {
     }
 }
 
+
 rootProject.name = "Alris"
 include(":app")
