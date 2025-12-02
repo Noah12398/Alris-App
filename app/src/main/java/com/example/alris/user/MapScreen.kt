@@ -3,6 +3,7 @@ package com.example.alris.user
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.drawable.Drawable
+import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -22,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -67,7 +67,7 @@ fun MapScreen() {
     var currentMapType by remember { mutableStateOf(MapType.STANDARD) }
     var showMyLocation by remember { mutableStateOf(true) }
 
-    val mapView = rememberMapViewWithLifecycle(showMyLocation = true)
+    val mapView = rememberMapViewWithLifecycle(showMyLocation = showMyLocation)
 
     // Load API data on first load
     LaunchedEffect(Unit) {
@@ -78,7 +78,6 @@ fun MapScreen() {
         )
     }
 
-    // --- MAP UI ---
     Box(modifier = Modifier.fillMaxSize()) {
         // Map View
         AndroidView(
@@ -90,31 +89,34 @@ fun MapScreen() {
                 mv.setTileSource(currentMapType.tileSource)
             }
 
-            // Clear markers (keep location overlay)
+            // Clear previous markers (keep location overlay)
             mv.overlays.removeAll { it is Marker }
 
-            // Add markers
+            // Add markers for all issues
             issues.forEach { report ->
-                val geo = parsePoint(report.location) ?: return@forEach
-                val marker = Marker(mv).apply {
-                    position = geo
-                    title = report.title
-                    snippet = report.description
-                    icon = getMarkerIcon(context, report.category, report.status)
-                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-
-                    setOnMarkerClickListener { _, _ ->
-                        selectedReport = report
-                        true
+                val geo = parseWkbHex(report.location)
+                if (geo != null) {
+                    val marker = Marker(mv).apply {
+                        position = geo
+                        title = report.title
+                        snippet = report.description
+                        icon = getMarkerIcon(context, report.category, report.status)
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                        setOnMarkerClickListener { _, _ ->
+                            selectedReport = report
+                            mv.controller.animateTo(geo)
+                            mv.controller.setZoom(18.0)
+                            true
+                        }
                     }
+                    mv.overlays.add(marker)
                 }
-                mv.overlays.add(marker)
             }
 
-            // Center map on first marker with PROPER ZOOM (FIXED)
+            // Center map on first marker
             if (issues.isNotEmpty()) {
-                parsePoint(issues[0].location)?.let {
-                    mv.controller.setZoom(30.0) // Changed from 13.0 to 16.0 for city-level view
+                parseWkbHex(issues[0].location)?.let {
+                    mv.controller.setZoom(16.0)
                     mv.controller.setCenter(it)
                 }
             }
@@ -135,7 +137,7 @@ fun MapScreen() {
                 .padding(16.dp)
         )
 
-        // Logout Button at top right
+        // Logout Button
         FloatingActionButton(
             onClick = { logoutAndGoToLogin(context) },
             modifier = Modifier
@@ -161,7 +163,7 @@ fun MapScreen() {
                 report = report,
                 onDismiss = { selectedReport = null },
                 onNavigate = {
-                    parsePoint(report.location)?.let { geo ->
+                    parseWkbHex(report.location)?.let { geo ->
                         mapView.controller.animateTo(geo)
                         mapView.controller.setZoom(18.0)
                     }
@@ -189,7 +191,7 @@ fun MapScreen() {
                 reports = issues,
                 onReportClick = { report ->
                     selectedReport = report
-                    parsePoint(report.location)?.let { geo ->
+                    parseWkbHex(report.location)?.let { geo ->
                         mapView.controller.animateTo(geo)
                         mapView.controller.setZoom(17.0)
                     }
@@ -210,21 +212,20 @@ fun MapScreen() {
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary
         ) {
-            Icon(
-                Icons.Default.Add,
-                contentDescription = "Add Report",
-                modifier = Modifier.size(24.dp)
-            )
+            Icon(Icons.Default.Add, contentDescription = "Add Report", modifier = Modifier.size(24.dp))
         }
     }
 
-    // Auto-pagination (load more if available)
+    // Auto-pagination
     if (viewModel.hasMore) {
         LaunchedEffect(issues.size) {
             viewModel.loadNearbyIssues()
         }
     }
 }
+// --- GET MARKER ICON ---
+private fun getMarkerIcon(context: Context, category: ReportCategory, status: ReportStatus): Drawable? =
+    ContextCompat.getDrawable(context, android.R.drawable.ic_menu_mylocation)
 
 // --- TOP CONTROLS ---
 @Composable
@@ -501,6 +502,31 @@ fun ReportListItem(report: ReportPoint, onClick: () -> Unit) {
         }
     }
 }
+fun parseWkbHex(wkbHex: String): GeoPoint? {
+    try {
+        val bytes = wkbHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+
+        val byteOrder = bytes[0].toInt()
+        val littleEndian = byteOrder == 1
+
+        fun bytesToDouble(b: ByteArray) =
+            java.nio.ByteBuffer.wrap(b).apply {
+                if (littleEndian) order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            }.double
+
+        // Skip 1 byte (byte order) + 4 bytes (geom type) + 4 bytes (SRID)
+        val xBytes = bytes.copyOfRange(9, 17) // longitude
+        val yBytes = bytes.copyOfRange(17, 25) // latitude
+
+        val x = bytesToDouble(xBytes)
+        val y = bytesToDouble(yBytes)
+        Log.d("DEBUG_LOCATION", "Parsed WKB lat=$y lon=$x")
+        return GeoPoint(y, x)
+    } catch (e: Exception) {
+        Log.e("DEBUG_LOCATION", "Failed to parse WKB: $wkbHex", e)
+        return null
+    }
+}
 
 // --- REMEMBER MAPVIEW WITH LIFECYCLE ---
 @Composable
@@ -551,17 +577,8 @@ fun rememberMapViewWithLifecycle(showMyLocation: Boolean = false): MapView {
     return mapView
 }
 
-// --- PARSE POINT STRING ---
-fun parsePoint(point: String): GeoPoint? {
-    val regex = Regex("""POINT\(([-0-9.]+)\s+([-0-9.]+)\)""")
-    val match = regex.find(point) ?: return null
-    val (lon, lat) = match.destructured
-    return GeoPoint(lat.toDouble(), lon.toDouble())
-}
 
 // --- MARKER ICON ---
-private fun getMarkerIcon(context: Context, category: ReportCategory, status: ReportStatus): Drawable? =
-    ContextCompat.getDrawable(context, android.R.drawable.ic_menu_mylocation)
 
 // --- VIEWMODEL ---
 class MapViewModel(private val api: UserApi) : ViewModel() {
