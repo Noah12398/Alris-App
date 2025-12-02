@@ -57,21 +57,26 @@ android {
 
 
 }
-
 dependencies {
-    // Supabase Kotlin SDK
+    // Supabase Kotlin SDK (managed by BOM)
+    implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("androidx.datastore:datastore-core:1.1.1")
     implementation(platform("io.github.jan-tennert.supabase:bom:3.2.1"))
-    implementation("io.github.jan-tennert.supabase:auth-kt")       // for authentication
-    implementation("io.github.jan-tennert.supabase:postgrest-kt")  // for database
-    // … add other modules if you need them, like realtime-kt, storage-kt, etc.
+    implementation("io.github.jan-tennert.supabase:auth-kt")       // ✅ GoTrue/Auth
+    implementation("io.github.jan-tennert.supabase:postgrest-kt")  // ✅ Database
+    // add others if needed: realtime-kt, storage-kt, functions-kt
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:5.0.0-alpha.11")
 
-    implementation("io.ktor:ktor-client-android:3.2.1")  // Ktor engine
-    // Firebase BoM (manages versioning)
+    implementation("io.ktor:ktor-client-android:3.2.1")
+
+    // Firebase BoM
     implementation(platform("com.google.firebase:firebase-bom:32.7.3"))
-
-    // Firebase libraries (no version numbers!)
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
+
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
 
     // Google Sign-In
@@ -86,6 +91,22 @@ dependencies {
     implementation("org.osmdroid:osmdroid-android:6.1.14")
     implementation("androidx.compose.material:material-icons-extended")
 
+
+    // HTTP Client
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // JSON handling
+    implementation("org.json:json:20230618")
+
+    // Compose Material3
+    implementation("androidx.compose.material3:material3:1.1.2")
+    implementation("androidx.compose.ui:ui-tooling-preview:1.5.4")
+
+    // Activity Compose
+    implementation("androidx.activity:activity-compose:1.8.0")
+
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     // OkHttp
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")

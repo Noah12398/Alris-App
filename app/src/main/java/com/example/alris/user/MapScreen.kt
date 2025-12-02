@@ -1,10 +1,8 @@
 package com.example.alris.user
 
-import android.R
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.drawable.Drawable
-import android.view.ViewGroup
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -26,122 +24,103 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.*
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.alris.Constants.logoutAndGoToLogin
+import com.example.alris.data.*
+import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.ITileSource
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
-import org.osmdroid.tileprovider.tilesource.ITileSource
 
-
+// --- MAIN MAP SCREEN ---
 @SuppressLint("MissingPermission")
 @Composable
 fun MapScreen() {
     val context = LocalContext.current
-    var mapView by remember { mutableStateOf<MapView?>(null) }
+
+    // API client
+    val api = remember { ApiClient.createUserApi(context) }
+
+    // ViewModel
+    val viewModel: MapViewModel = viewModel(factory = object : ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            @Suppress("UNCHECKED_CAST")
+            return MapViewModel(api) as T
+        }
+    })
+
+    val issues = viewModel.issues
     var selectedReport by remember { mutableStateOf<ReportPoint?>(null) }
     var isReportListVisible by remember { mutableStateOf(false) }
     var currentMapType by remember { mutableStateOf(MapType.STANDARD) }
     var showMyLocation by remember { mutableStateOf(true) }
 
-    // Sample report data
-    val reportPoints = remember {
-        listOf(
-            ReportPoint(
-                id = 1,
-                lat = 8.5123,
-                lon = 76.9416,
-                title = "Drainage Issue",
-                description = "Water logging during rainy season",
-                category = ReportCategory.DRAINAGE,
-                timestamp = "2 hours ago",
-                status = ReportStatus.PENDING
-            ),
-            ReportPoint(
-                id = 2,
-                lat = 8.5130,
-                lon = 76.9420,
-                title = "Broken Streetlight",
-                description = "Street light not working for 3 days",
-                category = ReportCategory.LIGHTING,
-                timestamp = "1 day ago",
-                status = ReportStatus.IN_PROGRESS
-            ),
+    val mapView = rememberMapViewWithLifecycle(showMyLocation = true)
 
-            ReportPoint(
-                id = 4,
-                lat = 8.5115,
-                lon = 76.9400,
-                title = "Garbage Overflow",
-                description = "Garbage bin overflowing",
-                category = ReportCategory.WASTE,
-                timestamp = "5 hours ago",
-                status = ReportStatus.PENDING
-            )
+    // Load API data on first load
+    LaunchedEffect(Unit) {
+        viewModel.resetAndReload(
+            userLatitude = 8.8932,
+            userLongitude = 76.6141,
+            radiusKm = 10
         )
     }
 
+    // --- MAP UI ---
     Box(modifier = Modifier.fillMaxSize()) {
         // Map View
         AndroidView(
-            factory = { ctx ->
-                Configuration.getInstance().load(ctx, ctx.getSharedPreferences("osmdroid", 0))
-                Configuration.getInstance().userAgentValue = ctx.packageName
+            factory = { mapView },
+            modifier = Modifier.fillMaxSize()
+        ) { mv ->
+            // Update tile source if map type changed
+            if (mv.tileProvider.tileSource != currentMapType.tileSource) {
+                mv.setTileSource(currentMapType.tileSource)
+            }
 
-                MapView(ctx).apply {
-                    setTileSource(currentMapType.tileSource)
-                    setMultiTouchControls(true)
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
+            // Clear markers (keep location overlay)
+            mv.overlays.removeAll { it is Marker }
 
-                    controller.setZoom(16.0)
-                    controller.setCenter(GeoPoint(8.5126, 76.9419))
+            // Add markers
+            issues.forEach { report ->
+                val geo = parsePoint(report.location) ?: return@forEach
+                val marker = Marker(mv).apply {
+                    position = geo
+                    title = report.title
+                    snippet = report.description
+                    icon = getMarkerIcon(context, report.category, report.status)
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
 
-                    // Add location overlay
-                    if (showMyLocation) {
-                        val locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(ctx), this)
-                        locationOverlay.enableMyLocation()
-                        overlays.add(locationOverlay)
+                    setOnMarkerClickListener { _, _ ->
+                        selectedReport = report
+                        true
                     }
-
-                    // Add report markers
-                    reportPoints.forEach { report ->
-                        val marker = Marker(this).apply {
-                            position = GeoPoint(report.lat, report.lon)
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                            title = report.title
-                            snippet = report.description
-                            icon = getMarkerIcon(ctx, report.category, report.status)
-
-                            setOnMarkerClickListener { marker, _ ->
-                                selectedReport = report
-                                true
-                            }
-                        }
-                        overlays.add(marker)
-                    }
-
-                    invalidate()
-                    mapView = this
                 }
-            },
-            update = { view ->
-                // Update map type if changed
-                if (view.tileProvider.tileSource != currentMapType.tileSource) {
-                    view.setTileSource(currentMapType.tileSource)
+                mv.overlays.add(marker)
+            }
+
+            // Center map on first marker with PROPER ZOOM (FIXED)
+            if (issues.isNotEmpty()) {
+                parsePoint(issues[0].location)?.let {
+                    mv.controller.setZoom(30.0) // Changed from 13.0 to 16.0 for city-level view
+                    mv.controller.setCenter(it)
                 }
             }
-        )
+
+            mv.invalidate()
+        }
 
         // Top Controls
         MapTopControls(
@@ -156,12 +135,12 @@ fun MapScreen() {
                 .padding(16.dp)
         )
 
-        // 🚀 Logout Button at top right
+        // Logout Button at top right
         FloatingActionButton(
             onClick = { logoutAndGoToLogin(context) },
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = 16.dp, end = 16.dp),
+                .padding(top = 80.dp, end = 16.dp),
             containerColor = MaterialTheme.colorScheme.error,
             contentColor = MaterialTheme.colorScheme.onError
         ) {
@@ -170,19 +149,23 @@ fun MapScreen() {
 
         // Statistics Card
         MapStatsCard(
-            reportPoints = reportPoints,
+            reportPoints = issues,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = 80.dp, end = 16.dp)
+                .padding(top = 140.dp, end = 16.dp)
         )
-
 
         // Report Details Bottom Sheet
         selectedReport?.let { report ->
             ReportDetailsCard(
                 report = report,
                 onDismiss = { selectedReport = null },
-                onNavigate = { /* Navigate to report */ },
+                onNavigate = {
+                    parsePoint(report.location)?.let { geo ->
+                        mapView.controller.animateTo(geo)
+                        mapView.controller.setZoom(18.0)
+                    }
+                },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp)
@@ -194,23 +177,22 @@ fun MapScreen() {
             visible = isReportListVisible,
             enter = slideInHorizontally(
                 initialOffsetX = { -it },
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy
-                )
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)
             ) + fadeIn(),
-            exit = slideOutHorizontally(
-                targetOffsetX = { -it }
-            ) + fadeOut(),
+            exit = slideOutHorizontally(targetOffsetX = { -it }) + fadeOut(),
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .fillMaxHeight()
                 .width(320.dp)
         ) {
             ReportsListPanel(
-                reports = reportPoints,
+                reports = issues,
                 onReportClick = { report ->
                     selectedReport = report
-                    mapView?.controller?.animateTo(GeoPoint(report.lat, report.lon))
+                    parsePoint(report.location)?.let { geo ->
+                        mapView.controller.animateTo(geo)
+                        mapView.controller.setZoom(17.0)
+                    }
                 },
                 onClose = { isReportListVisible = false },
                 modifier = Modifier
@@ -235,8 +217,16 @@ fun MapScreen() {
             )
         }
     }
+
+    // Auto-pagination (load more if available)
+    if (viewModel.hasMore) {
+        LaunchedEffect(issues.size) {
+            viewModel.loadNearbyIssues()
+        }
+    }
 }
 
+// --- TOP CONTROLS ---
 @Composable
 fun MapTopControls(
     currentMapType: MapType,
@@ -265,9 +255,7 @@ fun MapTopControls(
             )
         }
 
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             // Map Type Selector
             Card(
                 modifier = Modifier.shadow(4.dp, RoundedCornerShape(12.dp)),
@@ -276,9 +264,7 @@ fun MapTopControls(
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(4.dp)
-                ) {
+                Row(modifier = Modifier.padding(4.dp)) {
                     MapType.values().forEach { type ->
                         val isSelected = currentMapType == type
                         Box(
@@ -323,6 +309,7 @@ fun MapTopControls(
     }
 }
 
+// --- STATS CARD ---
 @Composable
 fun MapStatsCard(
     reportPoints: List<ReportPoint>,
@@ -350,21 +337,9 @@ fun MapStatsCard(
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            StatItem(
-                count = pendingCount,
-                label = "Pending",
-                color = MaterialTheme.colorScheme.error
-            )
-            StatItem(
-                count = inProgressCount,
-                label = "In Progress",
-                color = MaterialTheme.colorScheme.tertiary
-            )
-            StatItem(
-                count = resolvedCount,
-                label = "Resolved",
-                color = Color.Green
-            )
+            StatItem(pendingCount, "Pending", MaterialTheme.colorScheme.error)
+            StatItem(inProgressCount, "In Progress", MaterialTheme.colorScheme.tertiary)
+            StatItem(resolvedCount, "Resolved", Color.Green)
         }
     }
 }
@@ -389,6 +364,7 @@ fun StatItem(count: Int, label: String, color: Color) {
     }
 }
 
+// --- REPORT DETAILS CARD ---
 @Composable
 fun ReportDetailsCard(
     report: ReportPoint,
@@ -405,18 +381,14 @@ fun ReportDetailsCard(
         ),
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(20.dp)
-        ) {
+        Column(modifier = Modifier.padding(20.dp)) {
             // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         report.category.icon,
                         contentDescription = null,
@@ -431,22 +403,14 @@ fun ReportDetailsCard(
                     )
                 }
                 IconButton(onClick = onDismiss) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "Close",
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Icon(Icons.Default.Close, contentDescription = "Close", modifier = Modifier.size(20.dp))
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-
-            // Status Badge
             StatusBadge(status = report.status)
-
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Description
             Text(
                 text = report.description,
                 style = MaterialTheme.typography.bodyMedium,
@@ -454,29 +418,19 @@ fun ReportDetailsCard(
             )
 
             Spacer(modifier = Modifier.height(8.dp))
-
-            // Timestamp
             Text(
-                text = "Reported ${report.timestamp}",
+                text = "Reported ${report.created_at}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(modifier = Modifier.height(16.dp))
-
-            // Action Button
             Button(
                 onClick = onNavigate,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
-                Icon(
-                    Icons.Default.Navigation,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
+                Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Navigate to Location")
             }
@@ -484,6 +438,7 @@ fun ReportDetailsCard(
     }
 }
 
+// --- REPORTS LIST PANEL ---
 @Composable
 fun ReportsListPanel(
     reports: List<ReportPoint>,
@@ -493,49 +448,30 @@ fun ReportsListPanel(
 ) {
     Card(
         modifier = modifier.shadow(8.dp, RoundedCornerShape(16.dp)),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(16.dp)
     ) {
-        Column(
-            modifier = Modifier.fillMaxHeight()
-        ) {
-            // Header
+        Column(modifier = Modifier.fillMaxHeight()) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Reports",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("Reports", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 IconButton(onClick = onClose) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "Close",
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Icon(Icons.Default.Close, contentDescription = "Close", modifier = Modifier.size(20.dp))
                 }
             }
 
-            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
 
-            // Reports List
             LazyColumn(
                 modifier = Modifier.fillMaxHeight(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(reports) { report ->
-                    ReportListItem(
-                        report = report,
-                        onClick = { onReportClick(report) }
-                    )
+                    ReportListItem(report = report, onClick = { onReportClick(report) })
                 }
             }
         }
@@ -543,14 +479,9 @@ fun ReportsListPanel(
 }
 
 @Composable
-fun ReportListItem(
-    report: ReportPoint,
-    onClick: () -> Unit
-) {
+fun ReportListItem(report: ReportPoint, onClick: () -> Unit) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         ),
@@ -560,41 +491,167 @@ fun ReportListItem(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                report.category.icon,
-                contentDescription = null,
-                tint = report.category.color,
-                modifier = Modifier.size(24.dp)
-            )
+            Icon(report.category.icon, contentDescription = null, tint = report.category.color, modifier = Modifier.size(24.dp))
             Spacer(modifier = Modifier.width(12.dp))
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = report.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = report.timestamp,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(report.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                Text(report.created_at, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             StatusBadge(status = report.status, compact = true)
         }
     }
 }
 
+// --- REMEMBER MAPVIEW WITH LIFECYCLE ---
 @Composable
-fun StatusBadge(
-    status: ReportStatus,
-    compact: Boolean = false
-) {
+fun rememberMapViewWithLifecycle(showMyLocation: Boolean = false): MapView {
+    val context = LocalContext.current
+
+    // Load OsmDroid config
+    Configuration.getInstance().load(
+        context,
+        context.getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
+    )
+    Configuration.getInstance().userAgentValue = context.packageName
+
+    val mapView = remember {
+        MapView(context).apply {
+
+            // Set map source (default: MAPNIK)
+            setTileSource(TileSourceFactory.MAPNIK)
+            setMultiTouchControls(true)
+
+            // FIX: Avoid zoomed-out default view
+            controller.setZoom(17.0)  // Good city-level zoom
+            controller.setCenter(GeoPoint(8.8932, 76.6141))  // Initial center
+
+            // Optional: My location overlay
+            if (showMyLocation) {
+                val overlay = MyLocationNewOverlay(GpsMyLocationProvider(context), this)
+                overlay.enableMyLocation()
+                overlays.add(overlay)
+            }
+        }
+    }
+
+    // Lifecycle handler
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                else -> {}
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+
+    return mapView
+}
+
+// --- PARSE POINT STRING ---
+fun parsePoint(point: String): GeoPoint? {
+    val regex = Regex("""POINT\(([-0-9.]+)\s+([-0-9.]+)\)""")
+    val match = regex.find(point) ?: return null
+    val (lon, lat) = match.destructured
+    return GeoPoint(lat.toDouble(), lon.toDouble())
+}
+
+// --- MARKER ICON ---
+private fun getMarkerIcon(context: Context, category: ReportCategory, status: ReportStatus): Drawable? =
+    ContextCompat.getDrawable(context, android.R.drawable.ic_menu_mylocation)
+
+// --- VIEWMODEL ---
+class MapViewModel(private val api: UserApi) : ViewModel() {
+    var issues by mutableStateOf<List<ReportPoint>>(emptyList())
+        private set
+    var hasMore by mutableStateOf(false)
+        private set
+    private var offset = 0
+    private val limit = 50
+    private var currentRadiusKm: Int = 10
+    private var currentUserLatitude: Double? = null
+    private var currentUserLongitude: Double? = null
+
+    fun loadNearbyIssues(
+        radiusKm: Int = currentRadiusKm,
+        userLatitude: Double? = currentUserLatitude,
+        userLongitude: Double? = currentUserLongitude
+    ) {
+        viewModelScope.launch {
+            try {
+                val response = if (userLatitude != null && userLongitude != null) {
+                    api.getNearbyIssuesForCitizen(
+                        NearbyIssuesRequest(userLatitude, userLongitude),
+                        radiusKm, limit, offset
+                    )
+                } else {
+                    api.getNearbyIssuesForAuthority(radiusKm, limit, offset)
+                }
+
+                val newIssues = response.issues.map { issue ->
+                    ReportPoint(
+                        id = issue.id,
+                        title = issue.title ?: "Issue #${issue.id}",
+                        description = issue.description ?: "No description",
+                        location = issue.location,
+                        category = when (issue.category?.lowercase()) {
+                            "drainage" -> ReportCategory.DRAINAGE
+                            "lighting" -> ReportCategory.LIGHTING
+                            "waste", "garbage" -> ReportCategory.WASTE
+                            "road" -> ReportCategory.ROAD
+                            "water" -> ReportCategory.WATER
+                            "electricity" -> ReportCategory.ELECTRICITY
+                            else -> ReportCategory.OTHER
+                        },
+                        status = when (issue.status?.lowercase()) {
+                            "submitted", "pending" -> ReportStatus.PENDING
+                            "ongoing", "in_progress" -> ReportStatus.IN_PROGRESS
+                            "approved" -> ReportStatus.APPROVED
+                            "rejected" -> ReportStatus.REJECTED
+                            "resolved" -> ReportStatus.RESOLVED
+                            else -> ReportStatus.PENDING
+                        },
+                        distance_meters = 0.0,
+                        distance_km = 0.0,
+                        created_at = issue.created_at ?: ""
+                    )
+                }
+
+                issues = issues + newIssues
+                hasMore = response.hasMore
+                offset += limit
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun resetAndReload(
+        radiusKm: Int = 10,
+        userLatitude: Double? = null,
+        userLongitude: Double? = null
+    ) {
+        currentRadiusKm = radiusKm
+        currentUserLatitude = userLatitude
+        currentUserLongitude = userLongitude
+        offset = 0
+        issues = emptyList()
+        loadNearbyIssues(radiusKm, userLatitude, userLongitude)
+    }
+}
+
+// --- STATUS BADGE ---
+@Composable
+fun StatusBadge(status: ReportStatus, compact: Boolean = false) {
     val (color, text) = when (status) {
         ReportStatus.PENDING -> MaterialTheme.colorScheme.error to "Pending"
         ReportStatus.IN_PROGRESS -> MaterialTheme.colorScheme.tertiary to "In Progress"
-        ReportStatus.RESOLVED -> Color.Green to "Resolved"
+        ReportStatus.APPROVED -> Color(0xFF4CAF50) to "Approved"
+        ReportStatus.REJECTED -> Color(0xFFF44336) to "Rejected"
+        ReportStatus.RESOLVED -> Color(0xFF2196F3) to "Resolved"
     }
 
     Box(
@@ -603,46 +660,11 @@ fun StatusBadge(
             .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
             .padding(horizontal = if (compact) 6.dp else 8.dp, vertical = 4.dp)
     ) {
-        Text(
-            text = text,
-            color = color,
-            style = MaterialTheme.typography.bodySmall,
-            fontSize = if (compact) 10.sp else 12.sp,
-            fontWeight = FontWeight.SemiBold
-        )
+        Text(text, color = color, style = MaterialTheme.typography.bodySmall, fontSize = if (compact) 10.sp else 12.sp)
     }
 }
 
-// Helper function to get marker icon based on category and status
-private fun getMarkerIcon(context: Context, category: ReportCategory, status: ReportStatus): Drawable? {
-    // You can customize this to use different icons for different categories and statuses
-    return ContextCompat.getDrawable(context, R.drawable.ic_menu_mylocation)
-}
-
-// Data classes
-data class ReportPoint(
-    val id: Int,
-    val lat: Double,
-    val lon: Double,
-    val title: String,
-    val description: String,
-    val category: ReportCategory,
-    val timestamp: String,
-    val status: ReportStatus
-)
-
-enum class ReportCategory(val icon: ImageVector, val color: Color) {
-    DRAINAGE(Icons.Default.Water, Color.Blue),
-    LIGHTING(Icons.Default.LightMode, Color.Yellow),
-    WASTE(Icons.Default.Delete, Color.Green)
-}
-
-enum class ReportStatus {
-    PENDING,
-    IN_PROGRESS,
-    RESOLVED
-}
-
+// --- MAP TYPE ---
 enum class MapType(val displayName: String, val tileSource: ITileSource) {
     STANDARD("Map", TileSourceFactory.MAPNIK),
     SATELLITE("Satellite", TileSourceFactory.WIKIMEDIA)
