@@ -171,3 +171,41 @@ enum class ReportStatus {
     REJECTED,
     RESOLVED
 }
+
+
+data class DepartmentIssuesResponse(
+    val issues: List<Issue>
+)
+
+data class Issue(
+    val issue_id: String,           // <-- String, not Int
+    val issue_latitude: Double,
+    val issue_longitude: Double,
+    val status: String,
+    val category: String?,
+    val reports: List<ReportSummary>
+)
+
+data class ReportSummary(
+    val report_id: String,          // <-- String, not Int
+    val description: String?,
+    val uploads: List<ReportUploadSummary>
+)
+
+
+data class ReportUploadSummary(
+    val url: String,
+    val uploaded_at: String?,
+    val is_fake: Boolean?,
+    val is_spam: Boolean?
+)
+
+data class StatusUpdate(
+    val issueId: String,
+    val status: String
+)
+
+data class StatusResponse(
+    val message: String,
+    val issue: Issue
+)

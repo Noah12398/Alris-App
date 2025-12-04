@@ -10,21 +10,26 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.alris.data.LoginRequest
 import com.example.alris.data.TokenManager
-import com.example.alris.user.DashboardActivity
+// ⭐ ADD THESE IMPORTS
+import com.example.alris.user.UserDashboardActivity
+import com.example.alris.authority.AuthorityDashboardActivity
+import com.example.alris.higher_authority.HigherAuthorityDashboardActivity
+// ⭐
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.jvm.java
 
 @Composable
 fun LoginScreen(onLoginResult: (String) -> Unit) {
     val context = LocalContext.current
-
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var role by remember { mutableStateOf("user") }
     var isLoading by remember { mutableStateOf(false) }
+
+    val api = ApiClient.createUserApi(context)
+    val tokenManager = TokenManager(context)
 
     Column(modifier = Modifier.padding(16.dp)) {
         Text("Select Role", style = MaterialTheme.typography.titleMedium)
@@ -44,75 +49,97 @@ fun LoginScreen(onLoginResult: (String) -> Unit) {
             value = email,
             onValueChange = { email = it },
             label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
         )
 
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
             label = { Text("Password") },
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
         )
 
         Button(
             onClick = {
                 isLoading = true
                 val request = LoginRequest(email, password)
-                val tokenManager = TokenManager(context)
-                val api = ApiClient.createUserApi(context)
 
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
-                        val response = api.loginUser(request)
+                        val response = when (role) {
+                            "user" -> api.loginUser(request)
+                            "authority", "higher_authority" -> api.loginAuthority(request)
+                            else -> api.loginUser(request)
+                        }
+
                         if (response.isSuccessful) {
                             val loginResponse = response.body()
 
-                            loginResponse?.accessToken?.let { token ->
-                                tokenManager.saveAccessToken(token)
-                                println("Access Token Saved: $token")
-                            }
-                            loginResponse?.refreshToken?.let { token ->
-                                tokenManager.saveRefreshToken(token)
-                                println("Refresh Token Saved: $token")
-                            }
+                            loginResponse?.accessToken?.let { tokenManager.saveAccessToken(it) }
+                            loginResponse?.refreshToken?.let { tokenManager.saveRefreshToken(it) }
 
                             withContext(Dispatchers.Main) {
-                                Toast.makeText(context, "Login successful!", Toast.LENGTH_LONG).show()
+                                Toast.makeText(
+                                    context,
+                                    "${role.uppercase()} Login Successful!",
+                                    Toast.LENGTH_LONG
+                                ).show()
+
                                 onLoginResult(loginResponse?.accessToken ?: "")
-                                val intent = Intent(context, DashboardActivity::class.java)
-                                context.startActivity(intent)
+
+                                val nextScreen = when (role) {
+                                    "user" -> UserDashboardActivity::class.java
+                                    "authority" -> AuthorityDashboardActivity::class.java
+                                    "higher_authority" -> HigherAuthorityDashboardActivity::class.java
+                                    else -> UserDashboardActivity::class.java
+                                }
+
+                                context.startActivity(Intent(context, nextScreen))
                             }
                         } else {
                             withContext(Dispatchers.Main) {
-                                val errorMsg = response.errorBody()?.string() ?: "Unknown error"
-                                Toast.makeText(context, "Error: $errorMsg", Toast.LENGTH_LONG).show()
-                                println("Login error response: $errorMsg")
+                                Toast.makeText(
+                                    context,
+                                    "Login failed: ${response.errorBody()?.string()}",
+                                    Toast.LENGTH_LONG
+                                ).show()
                             }
                         }
                     } catch (e: Exception) {
                         withContext(Dispatchers.Main) {
-                            Toast.makeText(context, "Exception: ${e.message}", Toast.LENGTH_LONG).show()
-                            println("Login exception: ${e.message}")
+                            Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                         }
                     } finally {
-                        withContext(Dispatchers.Main) { isLoading = false }
+                        withContext(Dispatchers.Main) {
+                            isLoading = false
+                        }
                     }
                 }
             },
             enabled = !isLoading,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
         ) {
             Text(if (isLoading) "Logging in..." else "Login")
         }
 
-        Button(
-            onClick = {
-                val intent = Intent(context, RegisterActivity::class.java)
-                context.startActivity(intent)
-            },
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-        ) {
-            Text("Register")
+        // Show Register ONLY for "user" role
+        if (role == "user") {
+            Button(
+                onClick = {
+                    context.startActivity(Intent(context, RegisterActivity::class.java))
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            ) {
+                Text("Register")
+            }
         }
     }
 }

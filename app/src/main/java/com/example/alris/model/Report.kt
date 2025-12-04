@@ -12,3 +12,4 @@ data class Report(
     val public_url: String,
     val created_at: String
 )
+

@@ -1,5 +1,4 @@
-package com.example.alris.user
-import com.example.alris.user.MapScreen
+package com.example.alris.higher_authority
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -13,8 +12,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.alris.SettingsScreen
 import com.example.alris.ui.theme.AlrisTheme
+import com.example.alris.user.UserBottomNavigationBar
+import com.example.alris.user.MapScreen
+import com.example.alris.user.MultiPhotoCameraScreen
 
-class DashboardActivity : ComponentActivity() {
+class HigherAuthorityDashboardActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -22,13 +24,13 @@ class DashboardActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 Scaffold(
                     bottomBar = {
-                        BottomNavigationBar(navController)
+                        HigherAuthorityBottomNavigationBar(navController)
                     }
                 ) { padding ->
                     Box(modifier = Modifier.Companion.padding(padding)) {
                         NavHost(navController, startDestination = "map") {
                             composable("map") { MapScreen() }
-                            composable("camera") { MultiPhotoCameraScreen() }
+                            composable("department issues") { DepartmentIssuesScreen()}
                             composable("settings") { SettingsScreen() }
                         }
                     }

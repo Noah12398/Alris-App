@@ -49,7 +49,7 @@ class AuthInterceptor(private val tokenManager: TokenManager) : Interceptor {
         val path = request.url.encodedPath
         Log.d("DEBUG_INTERCEPTOR", "Path: $path")
 
-        if (
+        if (path.contains("/authority/login") ||
             path.contains("/auth/register") ||
             path.contains("/auth/login") ||
             path.contains("/api/auth/verify-token")

@@ -577,9 +577,6 @@ fun rememberMapViewWithLifecycle(showMyLocation: Boolean = false): MapView {
     return mapView
 }
 
-
-// --- MARKER ICON ---
-
 // --- VIEWMODEL ---
 class MapViewModel(private val api: UserApi) : ViewModel() {
     var issues by mutableStateOf<List<ReportPoint>>(emptyList())

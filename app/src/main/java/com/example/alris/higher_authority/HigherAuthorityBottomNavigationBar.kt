@@ -1,4 +1,5 @@
-package com.example.alris.user
+package com.example.alris.higher_authority
+
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -9,10 +10,10 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 
 @Composable
-fun BottomNavigationBar(navController: NavHostController) {
+fun HigherAuthorityBottomNavigationBar(navController: NavHostController) {
     val items = listOf(
         BottomNavItem("map", "Map", Icons.Default.Map),
-        BottomNavItem("camera", "Camera",Icons.Default.CameraAlt),
+        BottomNavItem("department issues", "Department Issues", Icons.Default.List),
         BottomNavItem("settings", "Settings", Icons.Default.Settings)
     )
 

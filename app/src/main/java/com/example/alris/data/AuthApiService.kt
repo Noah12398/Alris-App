@@ -8,6 +8,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.Multipart
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.Query
 
@@ -54,4 +55,15 @@ interface UserApi {
         @Query("limit") limit: Int = 50,
         @Query("offset") offset: Int = 0
     ): NearbyIssuesResponse
+
+    @POST("authority/login")
+    suspend fun loginAuthority(@Body request: LoginRequest): Response<LoginResponse>
+
+
+    @GET("issues/department")
+    suspend fun getDepartmentIssues(): Response<DepartmentIssuesResponse>
+
+    @PUT("issues/status")
+    suspend fun updateIssueStatus(@Body body: StatusUpdate): Response<StatusResponse>
+
 }
