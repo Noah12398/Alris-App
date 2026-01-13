@@ -71,4 +71,14 @@ interface UserApi {
     suspend fun registerLowerAuthority(
         @Body body: RegisterLowerAuthorityRequest
     ): RegisterLowerAuthorityResponse
+
+    @PUT("authority/update-profile")
+    suspend fun updateAuthorityProfile(
+        @Body request: UpdateAuthorityProfileRequest
+    ): Response<UpdateAuthorityProfileResponse>
+
+
+
 }
+
+

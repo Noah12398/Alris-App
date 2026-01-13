@@ -61,7 +61,7 @@
         <activity android:name=".user.UserDashboardActivity" />
         <activity android:name=".authority.PendingApprovalActivity" />
         <activity android:name=".admin.AdminActivity" />
-        <activity android:name=".authority.AuthorityDashboardActivity" />
+        <activity android:name=".lower_authority.LowerAuthorityDashboardActivity" />
         <activity android:name=".ui.screens.RegisterActivity" />
 
         <!-- FileProvider -->

@@ -36,7 +36,16 @@ data class LoginRequest(
 data class LoginResponse(
     val accessToken: String,
     val refreshToken: String,
-    val token_type: String = "Bearer"
+    val token_type: String = "Bearer",
+    val user: BackendUser
+)
+
+data class BackendUser(
+    val id: String,
+    val email: String,
+    val role: String,              // "authority" or "higher" or "user"
+    val department: String?,
+    val is_initialized: Boolean? = null  // only for lower authority
 )
 
 data class RegisterResponse(
@@ -225,6 +234,29 @@ data class Authority(
     val id: String,
     val email: String,
     val department: String
+)
+
+data class UpdateAuthorityProfileRequest(
+    val name: String?,
+    val phone: String?,
+    val latitude: Double?,
+    val longitude: Double?,
+    val newPassword: String?
+)
+
+data class UpdateAuthorityProfileResponse(
+    val message: String,
+    val authority: AuthorityProfile
+)
+
+data class AuthorityProfile(
+    val id: Int,
+    val name: String?,
+    val email: String,
+    val department: String,
+    val latitude: Double?,
+    val longitude: Double?,
+    val is_initialized: Boolean
 )
 
 

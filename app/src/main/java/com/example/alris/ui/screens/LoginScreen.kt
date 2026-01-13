@@ -15,7 +15,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -25,12 +24,9 @@ import androidx.compose.ui.unit.sp
 import com.example.alris.data.LoginRequest
 import com.example.alris.data.TokenManager
 import com.example.alris.user.UserDashboardActivity
-import com.example.alris.authority.AuthorityDashboardActivity
 import com.example.alris.higher_authority.HigherAuthorityDashboardActivity
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import com.example.alris.lower_authority.LowerAuthorityDashboardActivity
+import kotlinx.coroutines.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,7 +60,7 @@ fun LoginScreen(onLoginResult: (String) -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Header
+
             Text(
                 text = "ALRIS",
                 style = MaterialTheme.typography.displayMedium,
@@ -79,17 +75,11 @@ fun LoginScreen(onLoginResult: (String) -> Unit) {
                 modifier = Modifier.padding(bottom = 32.dp)
             )
 
-            // Role Selection Card
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(Modifier.padding(16.dp)) {
                     Text(
                         text = "Select Role",
                         style = MaterialTheme.typography.titleSmall,
@@ -109,12 +99,7 @@ fun LoginScreen(onLoginResult: (String) -> Unit) {
                             FilterChip(
                                 selected = role == value,
                                 onClick = { role = value },
-                                label = {
-                                    Text(
-                                        text = label,
-                                        fontSize = 13.sp
-                                    )
-                                },
+                                label = { Text(text = label, fontSize = 13.sp) },
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -122,65 +107,39 @@ fun LoginScreen(onLoginResult: (String) -> Unit) {
                 }
             }
 
-            // Email Field
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
                 label = { Text("Email") },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Email,
-                        contentDescription = "Email"
-                    )
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
+                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp)
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
             )
 
-            // Password Field
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
                 label = { Text("Password") },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Lock,
-                        contentDescription = "Password"
-                    )
-                },
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
-                            imageVector = if (passwordVisible)
-                                Icons.Default.Visibility
-                            else
-                                Icons.Default.VisibilityOff,
-                            contentDescription = if (passwordVisible)
-                                "Hide password"
-                            else
-                                "Show password"
+                            imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = null
                         )
                     }
                 },
-                visualTransformation = if (passwordVisible)
-                    VisualTransformation.None
-                else
-                    PasswordVisualTransformation(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp),
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp)
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
             )
 
-            // Login Button
             Button(
+                enabled = !isLoading && email.isNotBlank() && password.isNotBlank(),
                 onClick = {
                     isLoading = true
                     val request = LoginRequest(email, password)
+
                     CoroutineScope(Dispatchers.IO).launch {
                         try {
                             val response = when (role) {
@@ -189,90 +148,78 @@ fun LoginScreen(onLoginResult: (String) -> Unit) {
                                 else -> api.loginUser(request)
                             }
 
-                            if (response.isSuccessful) {
-                                val loginResponse = response.body()
-                                loginResponse?.accessToken?.let { tokenManager.saveAccessToken(it) }
-                                loginResponse?.refreshToken?.let { tokenManager.saveRefreshToken(it) }
-
+                            if (!response.isSuccessful) {
                                 withContext(Dispatchers.Main) {
-                                    Toast.makeText(
-                                        context,
-                                        "Login Successful!",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                    onLoginResult(loginResponse?.accessToken ?: "")
-
-                                    val nextScreen = when (role) {
-                                        "user" -> UserDashboardActivity::class.java
-                                        "authority" -> AuthorityDashboardActivity::class.java
-                                        "higher_authority" -> HigherAuthorityDashboardActivity::class.java
-                                        else -> UserDashboardActivity::class.java
-                                    }
-                                    context.startActivity(Intent(context, nextScreen))
+                                    Toast.makeText(context, "Login failed", Toast.LENGTH_LONG).show()
                                 }
-                            } else {
-                                withContext(Dispatchers.Main) {
-                                    Toast.makeText(
-                                        context,
-                                        "Login failed: ${response.errorBody()?.string()}",
-                                        Toast.LENGTH_LONG
-                                    ).show()
+                                return@launch
+                            }
+
+                            val loginResponse = response.body()!!
+                            tokenManager.saveAccessToken(loginResponse.accessToken)
+                            tokenManager.saveRefreshToken(loginResponse.refreshToken)
+
+                            // ✅ Proper backend user extraction
+                            val backendUser = loginResponse.user
+                            val backendRole = backendUser?.role   // "authority" | "higher"
+                            val isInitialized = backendUser?.is_initialized ?: true
+
+                            val mappedRole = when (backendRole) {
+                                "higher" -> "higher_authority"
+                                "authority" -> "authority"
+                                else -> "user"
+                            }
+
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(context, "Login Successful!", Toast.LENGTH_LONG).show()
+                                onLoginResult(loginResponse.accessToken)
+
+                                when (mappedRole) {
+                                    "authority" -> {
+                                        if (!isInitialized) {
+                                            val intent = Intent(context, LowerAuthorityDashboardActivity::class.java)
+                                            intent.putExtra("initialSetup", true)
+                                            context.startActivity(intent)
+                                        } else {
+                                            context.startActivity(Intent(context, LowerAuthorityDashboardActivity::class.java))
+                                        }
+                                    }
+                                    "higher_authority" -> {
+                                        context.startActivity(Intent(context, HigherAuthorityDashboardActivity::class.java))
+                                    }
+                                    else -> {
+                                        context.startActivity(Intent(context, UserDashboardActivity::class.java))
+                                    }
                                 }
                             }
+
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
-                                Toast.makeText(
-                                    context,
-                                    "Error: ${e.message}",
-                                    Toast.LENGTH_LONG
-                                ).show()
+                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                             }
                         } finally {
-                            withContext(Dispatchers.Main) {
-                                isLoading = false
-                            }
+                            withContext(Dispatchers.Main) { isLoading = false }
                         }
                     }
                 },
-                enabled = !isLoading && email.isNotBlank() && password.isNotBlank(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text(
-                        text = "Login",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+                if (isLoading)
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                else
+                    Text("Login", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
 
-            // Register Button (only for user role)
             if (role == "user") {
-                Spacer(modifier = Modifier.height(12.dp))
-
+                Spacer(Modifier.height(12.dp))
                 OutlinedButton(
                     onClick = {
                         context.startActivity(Intent(context, RegisterActivity::class.java))
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(12.dp)
+                    modifier = Modifier.fillMaxWidth().height(56.dp)
                 ) {
-                    Text(
-                        text = "Create Account",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Text("Create Account", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
