@@ -14,6 +14,7 @@ fun HigherAuthorityBottomNavigationBar(navController: NavHostController) {
     val items = listOf(
         BottomNavItem("map", "Map", Icons.Default.Map),
         BottomNavItem("department issues", "Department Issues", Icons.Default.List),
+        BottomNavItem("approval", "Approval", Icons.Default.Upcoming) ,
         BottomNavItem("settings", "Settings", Icons.Default.Settings)
     )
 

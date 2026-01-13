@@ -30,7 +30,8 @@ class HigherAuthorityDashboardActivity : ComponentActivity() {
                     Box(modifier = Modifier.Companion.padding(padding)) {
                         NavHost(navController, startDestination = "map") {
                             composable("map") { MapScreen() }
-                            composable("department issues") { DepartmentIssuesScreen()}
+                            composable("department issues") { DepartmentIssuesScreen() }
+                            composable("approval") { ApprovalScreen() }
                             composable("settings") { SettingsScreen() }
                         }
                     }

@@ -1,5 +1,6 @@
 package com.example.alris.data
 
+import android.content.Context
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.http.GET
@@ -66,4 +67,8 @@ interface UserApi {
     @PUT("issues/status")
     suspend fun updateIssueStatus(@Body body: StatusUpdate): Response<StatusResponse>
 
+    @POST("authority/register-lower")
+    suspend fun registerLowerAuthority(
+        @Body body: RegisterLowerAuthorityRequest
+    ): RegisterLowerAuthorityResponse
 }

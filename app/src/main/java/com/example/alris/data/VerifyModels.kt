@@ -209,3 +209,22 @@ data class StatusResponse(
     val message: String,
     val issue: Issue
 )
+
+
+data class RegisterLowerAuthorityRequest(
+    val email: String
+)
+
+data class RegisterLowerAuthorityResponse(
+    val message: String,
+    val authority: Authority,
+    val tempPassword: String
+)
+
+data class Authority(
+    val id: String,
+    val email: String,
+    val department: String
+)
+
+
