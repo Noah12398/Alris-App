@@ -584,8 +584,8 @@ class MapViewModel(private val api: UserApi) : ViewModel() {
                             id = issue.issue_id,
                             title = "${issue.category ?: "Issue"} #${issue.issue_id.take(8)}",
                             description = issue.reports?.firstOrNull()?.description ?: "No description",
-                            latitude = issue.latitude,
-                            longitude = issue.longitude,
+                            latitude = issue.latitude ?: 0.0,
+                            longitude = issue.longitude ?: 0.0,
                             category = when (issue.category?.lowercase()) {
                                 "drainage" -> ReportCategory.DRAINAGE
                                 "lighting" -> ReportCategory.LIGHTING
