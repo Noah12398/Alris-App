@@ -1,3 +1,5 @@
+package com.example.alris.data
+
 import android.content.Context
 import android.util.Log
 import com.example.alris.data.AuthInterceptor

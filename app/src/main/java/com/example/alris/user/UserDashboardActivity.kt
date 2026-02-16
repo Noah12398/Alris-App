@@ -28,6 +28,8 @@ class UserDashboardActivity : ComponentActivity() {
                         NavHost(navController, startDestination = "map") {
                             composable("map") { MapScreen() }
                             composable("camera") { MultiPhotoCameraScreen() }
+                            composable("my_reports") { MyReportsScreen() }
+                            composable("notifications") { NotificationsScreen() }
                             composable("settings") { SettingsScreen() }
                         }
                     }

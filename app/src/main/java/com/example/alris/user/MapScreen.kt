@@ -94,31 +94,29 @@ fun MapScreen() {
 
             // Add markers for all issues
             issues.forEach { report ->
-                val geo = parseWkbHex(report.location)
-                if (geo != null) {
-                    val marker = Marker(mv).apply {
-                        position = geo
-                        title = report.title
-                        snippet = report.description
-                        icon = getMarkerIcon(context, report.category, report.status)
-                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                        setOnMarkerClickListener { _, _ ->
-                            selectedReport = report
-                            mv.controller.animateTo(geo)
-                            mv.controller.setZoom(18.0)
-                            true
-                        }
+                val geo = GeoPoint(report.latitude, report.longitude)
+                val marker = Marker(mv).apply {
+                    position = geo
+                    title = report.title
+                    snippet = report.description
+                    icon = getMarkerIcon(context, report.category, report.status)
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    setOnMarkerClickListener { _, _ ->
+                        selectedReport = report
+                        mv.controller.animateTo(geo)
+                        mv.controller.setZoom(18.0)
+                        true
                     }
-                    mv.overlays.add(marker)
                 }
+                mv.overlays.add(marker)
             }
 
             // Center map on first marker
             if (issues.isNotEmpty()) {
-                parseWkbHex(issues[0].location)?.let {
-                    mv.controller.setZoom(16.0)
-                    mv.controller.setCenter(it)
-                }
+                val first = issues[0]
+                val firstGeo = GeoPoint(first.latitude, first.longitude)
+                mv.controller.setZoom(16.0)
+                mv.controller.setCenter(firstGeo)
             }
 
             mv.invalidate()
@@ -163,10 +161,9 @@ fun MapScreen() {
                 report = report,
                 onDismiss = { selectedReport = null },
                 onNavigate = {
-                    parseWkbHex(report.location)?.let { geo ->
-                        mapView.controller.animateTo(geo)
-                        mapView.controller.setZoom(18.0)
-                    }
+                    val geo = GeoPoint(report.latitude, report.longitude)
+                    mapView.controller.animateTo(geo)
+                    mapView.controller.setZoom(18.0)
                 },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -191,10 +188,9 @@ fun MapScreen() {
                 reports = issues,
                 onReportClick = { report ->
                     selectedReport = report
-                    parseWkbHex(report.location)?.let { geo ->
-                        mapView.controller.animateTo(geo)
-                        mapView.controller.setZoom(17.0)
-                    }
+                    val geo = GeoPoint(report.latitude, report.longitude)
+                    mapView.controller.animateTo(geo)
+                    mapView.controller.setZoom(17.0)
                 },
                 onClose = { isReportListVisible = false },
                 modifier = Modifier
@@ -502,31 +498,6 @@ fun ReportListItem(report: ReportPoint, onClick: () -> Unit) {
         }
     }
 }
-fun parseWkbHex(wkbHex: String): GeoPoint? {
-    try {
-        val bytes = wkbHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-
-        val byteOrder = bytes[0].toInt()
-        val littleEndian = byteOrder == 1
-
-        fun bytesToDouble(b: ByteArray) =
-            java.nio.ByteBuffer.wrap(b).apply {
-                if (littleEndian) order(java.nio.ByteOrder.LITTLE_ENDIAN)
-            }.double
-
-        // Skip 1 byte (byte order) + 4 bytes (geom type) + 4 bytes (SRID)
-        val xBytes = bytes.copyOfRange(9, 17) // longitude
-        val yBytes = bytes.copyOfRange(17, 25) // latitude
-
-        val x = bytesToDouble(xBytes)
-        val y = bytesToDouble(yBytes)
-        Log.d("DEBUG_LOCATION", "Parsed WKB lat=$y lon=$x")
-        return GeoPoint(y, x)
-    } catch (e: Exception) {
-        Log.e("DEBUG_LOCATION", "Failed to parse WKB: $wkbHex", e)
-        return null
-    }
-}
 
 // --- REMEMBER MAPVIEW WITH LIFECYCLE ---
 @Composable
@@ -596,47 +567,52 @@ class MapViewModel(private val api: UserApi) : ViewModel() {
     ) {
         viewModelScope.launch {
             try {
-                val response = if (userLatitude != null && userLongitude != null) {
-                    api.getNearbyIssuesForCitizen(
-                        NearbyIssuesRequest(userLatitude, userLongitude),
-                        radiusKm, limit, offset
-                    )
-                } else {
-                    api.getNearbyIssuesForAuthority(radiusKm, limit, offset)
-                }
+                val response = api.getNearbyIssues(
+                    latitude = userLatitude,
+                    longitude = userLongitude,
+                    radius = radiusKm,
+                    limit = limit,
+                    offset = offset
+                )
 
-                val newIssues = response.issues.map { issue ->
-                    ReportPoint(
-                        id = issue.id,
-                        title = issue.title ?: "Issue #${issue.id}",
-                        description = issue.description ?: "No description",
-                        location = issue.location,
-                        category = when (issue.category?.lowercase()) {
-                            "drainage" -> ReportCategory.DRAINAGE
-                            "lighting" -> ReportCategory.LIGHTING
-                            "waste", "garbage" -> ReportCategory.WASTE
-                            "road" -> ReportCategory.ROAD
-                            "water" -> ReportCategory.WATER
-                            "electricity" -> ReportCategory.ELECTRICITY
-                            else -> ReportCategory.OTHER
-                        },
-                        status = when (issue.status?.lowercase()) {
-                            "submitted", "pending" -> ReportStatus.PENDING
-                            "ongoing", "in_progress" -> ReportStatus.IN_PROGRESS
-                            "approved" -> ReportStatus.APPROVED
-                            "rejected" -> ReportStatus.REJECTED
-                            "resolved" -> ReportStatus.RESOLVED
-                            else -> ReportStatus.PENDING
-                        },
-                        distance_meters = 0.0,
-                        distance_km = 0.0,
-                        created_at = issue.created_at ?: ""
-                    )
-                }
+                if (response.isSuccessful) {
+                    val apiResponse = response.body()
+                    val data = apiResponse?.data ?: return@launch
 
-                issues = issues + newIssues
-                hasMore = response.hasMore
-                offset += limit
+                    val newIssues = data.issues.map { issue ->
+                        ReportPoint(
+                            id = issue.issue_id,
+                            title = "${issue.category ?: "Issue"} #${issue.issue_id.take(8)}",
+                            description = issue.reports?.firstOrNull()?.description ?: "No description",
+                            latitude = issue.latitude,
+                            longitude = issue.longitude,
+                            category = when (issue.category?.lowercase()) {
+                                "drainage" -> ReportCategory.DRAINAGE
+                                "lighting" -> ReportCategory.LIGHTING
+                                "waste", "garbage" -> ReportCategory.WASTE
+                                "road" -> ReportCategory.ROAD
+                                "water" -> ReportCategory.WATER
+                                "electricity" -> ReportCategory.ELECTRICITY
+                                else -> ReportCategory.OTHER
+                            },
+                            status = when (issue.status?.lowercase()) {
+                                "submitted" -> ReportStatus.PENDING
+                                "in_progress" -> ReportStatus.IN_PROGRESS
+                                "approved" -> ReportStatus.APPROVED
+                                "rejected" -> ReportStatus.REJECTED
+                                "resolved" -> ReportStatus.RESOLVED
+                                else -> ReportStatus.PENDING
+                            },
+                            distance_meters = issue.distance_meters ?: 0.0,
+                            distance_km = issue.distance_km ?: 0.0,
+                            created_at = issue.created_at ?: ""
+                        )
+                    }
+
+                    issues = issues + newIssues
+                    hasMore = data.hasMore
+                    offset += limit
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }

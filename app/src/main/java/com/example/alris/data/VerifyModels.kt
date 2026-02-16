@@ -9,6 +9,15 @@ import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.*
 
+// ============= GENERIC API RESPONSE WRAPPER =============
+// Backend wraps ALL responses in { success: Boolean, data: T?, message: String? }
+data class ApiResponse<T>(
+    val success: Boolean,
+    val data: T?,
+    val message: String? = null,
+    val error: String? = null
+)
+
 // ============= AUTH MODELS =============
 data class VerifyRequest(
     val accessToken: String,
@@ -33,19 +42,23 @@ data class LoginRequest(
     val password: String
 )
 
+// Inside { success: true, data: { accessToken, refreshToken, user } }
 data class LoginResponse(
     val accessToken: String,
     val refreshToken: String,
-    val token_type: String = "Bearer",
-    val user: BackendUser
+    val user: BackendUser?
 )
 
 data class BackendUser(
     val id: String,
     val email: String,
-    val role: String,              // "authority" or "higher" or "user"
-    val department: String?,
-    val is_initialized: Boolean? = null  // only for lower authority
+    val role: String?,              // "authority" | "higher" | "citizen"
+    val name: String? = null,
+    val department: String? = null,
+    val isInitialized: Boolean? = null,  // camelCase from Drizzle ORM
+    val trustScore: Double? = null,
+    val isFlagged: Boolean? = null,
+    val totalReports: Int? = null
 )
 
 data class RegisterResponse(
@@ -59,11 +72,17 @@ data class UserProfile(
     val name: String,
     val email: String,
     val phone: String?,
-    val created_at: String
+    val avatarUrl: String? = null,
+    val trustScore: Double? = null,
+    val isFlagged: Boolean? = null,
+    val totalReports: Int? = null,
+    val totalUpvotes: Int? = null,
+    val createdAt: String? = null
 )
 
 // ============= REPORT UPLOAD MODELS =============
-data class UploadResponse(
+// Inside { success: true, data: { report, uploads } }
+data class UploadResponseData(
     val report: Report,
     val uploads: List<ReportUpload>
 )
@@ -75,12 +94,12 @@ data class Report(
     val longitude: Double,
     val description: String?,
     val is_classified: Boolean = false,
-    val created_at: String
+    val created_at: String? = null
 )
 
 data class ReportUpload(
     val id: String,
-    val report_id: String,
+    val report_id: String? = null,
     val filename: String,
     val is_fake: Boolean? = null,
     val is_spam: Boolean? = null,
@@ -88,11 +107,7 @@ data class ReportUpload(
 )
 
 // ============= NEARBY ISSUES MODELS =============
-data class NearbyIssuesRequest(
-    val latitude: Double,
-    val longitude: Double
-)
-
+// Inside { success: true, data: { issues, total, limit, offset, hasMore } }
 data class NearbyIssuesResponse(
     val issues: List<IssueItem>,
     val total: Int,
@@ -101,17 +116,24 @@ data class NearbyIssuesResponse(
     val hasMore: Boolean
 )
 
+// Backend returns: issue_id, latitude, longitude, category, department,
+// status, priority, upvote_count, report_count, distance_meters, distance_km,
+// created_at, updated_at, reports[]
 data class IssueItem(
-    val id: String,
-    val title: String?,
-    val description: String?,
-    val location: String,  // POINT(lon lat) format from PostGIS
+    val issue_id: String,
+    val latitude: Double,
+    val longitude: Double,
     val category: String?,
     val status: String?,
     val department: String?,
-    val distance_meters: Double?,
-    val distance_km: Double?,
-    val created_at: String?
+    val priority: String? = null,
+    val upvote_count: Int? = null,
+    val report_count: Int? = null,
+    val distance_meters: Double? = null,
+    val distance_km: Double? = null,
+    val created_at: String? = null,
+    val updated_at: String? = null,
+    val reports: List<ReportSummary>? = null
 )
 
 // ============= UI MODELS (for displaying in app) =============
@@ -121,7 +143,8 @@ data class ReportPoint(
     val description: String,
     val category: ReportCategory,
     val status: ReportStatus,
-    val location: String, // POINT(lon lat) - parse to GeoPoint
+    val latitude: Double,
+    val longitude: Double,
     val distance_meters: Double,
     val distance_km: Double,
     val created_at: String
@@ -181,51 +204,65 @@ enum class ReportStatus {
     RESOLVED
 }
 
-
+// ============= DEPARTMENT ISSUES MODELS =============
+// Inside { success: true, data: { issues, total, limit, offset, hasMore } }
 data class DepartmentIssuesResponse(
-    val issues: List<Issue>
+    val issues: List<Issue>,
+    val total: Int? = null,
+    val limit: Int? = null,
+    val offset: Int? = null,
+    val hasMore: Boolean? = null
 )
 
 data class Issue(
-    val issue_id: String,           // <-- String, not Int
-    val issue_latitude: Double,
-    val issue_longitude: Double,
+    val issue_id: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
     val status: String,
     val category: String?,
-    val reports: List<ReportSummary>
+    val department: String? = null,
+    val priority: String? = null,
+    val upvote_count: Int? = null,
+    val report_count: Int? = null,
+    val created_at: String? = null,
+    val updated_at: String? = null,
+    val reports: List<ReportSummary> = emptyList()
 )
 
 data class ReportSummary(
-    val report_id: String,          // <-- String, not Int
+    val report_id: String,
+    val user_id: String? = null,
     val description: String?,
-    val uploads: List<ReportUploadSummary>
+    val created_at: String? = null,
+    val uploads: List<ReportUploadSummary> = emptyList()
 )
 
-
 data class ReportUploadSummary(
+    val id: String? = null,
     val url: String,
     val uploaded_at: String?,
     val is_fake: Boolean?,
     val is_spam: Boolean?
 )
 
+// Backend accepts: { issueId, status }
+// Valid statuses: "submitted", "in_progress", "resolved", "rejected"
 data class StatusUpdate(
     val issueId: String,
     val status: String
 )
 
 data class StatusResponse(
-    val message: String,
-    val issue: Issue
+    val message: String? = null
 )
 
-
+// ============= AUTHORITY MODELS =============
+// Inside { success: true, data: { authority, tempPassword }, message }
 data class RegisterLowerAuthorityRequest(
     val email: String
 )
 
-data class RegisterLowerAuthorityResponse(
-    val message: String,
+data class RegisterLowerAuthorityData(
     val authority: Authority,
     val tempPassword: String
 )
@@ -244,19 +281,73 @@ data class UpdateAuthorityProfileRequest(
     val newPassword: String?
 )
 
+// Inside { success: true, data: { id, name, email, ... } }
 data class UpdateAuthorityProfileResponse(
-    val message: String,
-    val authority: AuthorityProfile
-)
-
-data class AuthorityProfile(
-    val id: Int,
+    val id: String? = null,
     val name: String?,
-    val email: String,
-    val department: String,
-    val latitude: Double?,
-    val longitude: Double?,
-    val is_initialized: Boolean
+    val email: String? = null,
+    val department: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val isInitialized: Boolean? = null
 )
 
+// ============= MY REPORTS MODELS =============
 
+data class MyReportsResponse(
+    val reports: List<MyReportItem>,
+    val total: Int,
+    val limit: Int,
+    val offset: Int,
+    val hasMore: Boolean
+)
+
+data class MyReportItem(
+    val id: String,
+    val latitude: Double,
+    val longitude: Double,
+    val description: String?,
+    val is_classified: Boolean,
+    val created_at: String,
+    val issue: IssueSummary?,
+    val uploads: List<Upload>
+)
+
+data class Upload(
+    val id: String,
+    val filename: String? = null,
+    val url: String
+)
+
+data class IssueSummary(
+    val id: String,
+    val department: String?,
+    val category: String?,
+    val status: String,
+    val created_at: String,
+    val updated_at: String
+)
+
+// ============= NOTIFICATION MODELS =============
+
+data class NotificationResponse(
+    val notifications: List<NotificationItem>,
+    val total: Int,
+    val limit: Int,
+    val offset: Int,
+    val hasMore: Boolean
+)
+
+data class NotificationItem(
+    val id: String,
+    val recipientId: String,
+    val title: String,
+    val body: String,
+    val type: String?, // "status_update", "system", etc.
+    val isRead: Boolean,
+    val createdAt: String
+)
+
+data class UnreadCountResponse(
+    val unreadCount: Int
+)

@@ -18,6 +18,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.alris.SettingsScreen
+import com.example.alris.data.ApiClient
 import com.example.alris.data.UpdateAuthorityProfileRequest
 import com.example.alris.ui.theme.AlrisTheme
 import kotlinx.coroutines.CoroutineScope
@@ -62,15 +63,18 @@ class LowerAuthorityDashboardActivity : ComponentActivity() {
                                                     lon,
                                                     pass
                                                 )
-                                                api.updateAuthorityProfile(body)
+                                                val response = api.updateAuthorityProfile(body)
 
                                                 withContext(Dispatchers.Main) {
                                                     loading = false
-                                                    nav.navigate("settings") {
-                                                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
-                                                        launchSingleTop = true
+                                                    if (response.isSuccessful && response.body()?.success == true) {
+                                                        nav.navigate("settings") {
+                                                            popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                                                            launchSingleTop = true
+                                                        }
+                                                    } else {
+                                                        Log.e("PROFILE_UPDATE", "Failed: ${response.body()?.error ?: response.message()}")
                                                     }
-
                                                 }
                                             } catch (e: Exception) {
                                                 Log.e("PROFILE_UPDATE", "Failed: ${e.message}")

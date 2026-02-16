@@ -56,6 +56,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import com.example.alris.data.ApiClient
 import java.io.ByteArrayOutputStream
 import java.net.ConnectException
 import java.net.SocketTimeoutException
@@ -424,12 +425,13 @@ suspend fun uploadPhotosWithRetrofit(
 
         if (response.isSuccessful) {
             val body = response.body()
+            val uploadData = body?.data
             Log.d("UPLOAD_REQUEST", "✅ SUCCESS!")
-            Log.d("UPLOAD_REQUEST", "Report ID: ${body?.report?.id}")
-            Log.d("UPLOAD_REQUEST", "User ID: ${body?.report?.user_id}")
-            Log.d("UPLOAD_REQUEST", "Uploads count: ${body?.uploads?.size}")
+            Log.d("UPLOAD_REQUEST", "Report ID: ${uploadData?.report?.id}")
+            Log.d("UPLOAD_REQUEST", "User ID: ${uploadData?.report?.user_id}")
+            Log.d("UPLOAD_REQUEST", "Uploads count: ${uploadData?.uploads?.size}")
 
-            body?.uploads?.forEach { upload ->
+            uploadData?.uploads?.forEach { upload ->
                 Log.d("UPLOAD_REQUEST", "  Upload: ${upload.filename}")
             }
 

@@ -21,6 +21,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.alris.data.ApiClient
 import com.example.alris.data.LoginRequest
 import com.example.alris.data.TokenManager
 import com.example.alris.user.UserDashboardActivity
@@ -30,7 +31,10 @@ import kotlinx.coroutines.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(onLoginResult: (String) -> Unit) {
+fun LoginScreen(
+    onLoginResult: (String) -> Unit,
+    onNavigateToRegister: () -> Unit
+) {
     val context = LocalContext.current
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -155,14 +159,15 @@ fun LoginScreen(onLoginResult: (String) -> Unit) {
                                 return@launch
                             }
 
-                            val loginResponse = response.body()!!
-                            tokenManager.saveAccessToken(loginResponse.accessToken)
-                            tokenManager.saveRefreshToken(loginResponse.refreshToken)
+                            val apiResponse = response.body()!!
+                            val loginData = apiResponse.data!!
+                            tokenManager.saveAccessToken(loginData.accessToken)
+                            tokenManager.saveRefreshToken(loginData.refreshToken)
 
                             // ✅ Proper backend user extraction
-                            val backendUser = loginResponse.user
-                            val backendRole = backendUser?.role   // "authority" | "higher"
-                            val isInitialized = backendUser?.is_initialized ?: true
+                            val backendUser = loginData.user
+                            val backendRole = backendUser?.role   // "authority" | "higher" | "citizen"
+                            val isInitialized = backendUser?.isInitialized ?: true
 
                             val mappedRole = when (backendRole) {
                                 "higher" -> "higher_authority"
@@ -172,7 +177,7 @@ fun LoginScreen(onLoginResult: (String) -> Unit) {
 
                             withContext(Dispatchers.Main) {
                                 Toast.makeText(context, "Login Successful!", Toast.LENGTH_LONG).show()
-                                onLoginResult(loginResponse.accessToken)
+                                onLoginResult(loginData.accessToken)
 
                                 when (mappedRole) {
                                     "authority" -> {
@@ -214,9 +219,7 @@ fun LoginScreen(onLoginResult: (String) -> Unit) {
             if (role == "user") {
                 Spacer(Modifier.height(12.dp))
                 OutlinedButton(
-                    onClick = {
-                        context.startActivity(Intent(context, RegisterActivity::class.java))
-                    },
+                    onClick = onNavigateToRegister,
                     modifier = Modifier.fillMaxWidth().height(56.dp)
                 ) {
                     Text("Create Account", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
