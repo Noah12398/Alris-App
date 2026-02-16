@@ -108,4 +108,53 @@ interface UserApi {
     suspend fun markAllAsRead(
         @Body body: Map<String, String> = emptyMap()
     ): Response<ApiResponse<Any>>
+
+    // ============= NEW ENDPOINTS FOR BACKEND PARITY =============
+
+    @POST("ratings/user/{userId}")
+    suspend fun rateUser(
+        @Path("userId") userId: String,
+        @Body request: RateUserRequest
+    ): Response<ApiResponse<Any>>
+
+    @GET("ratings/user/{userId}")
+    suspend fun getUserRatings(
+        @Path("userId") userId: String
+    ): Response<ApiResponse<UserRatingsResponse>>
+
+    @GET("ratings/flagged")
+    suspend fun getFlaggedUsers(
+        @Query("limit") limit: Int = 50,
+        @Query("offset") offset: Int = 0
+    ): Response<ApiResponse<FlaggedUsersResponse>>
+
+    @GET("authority/profile")
+    suspend fun getAuthorityProfile(): Response<ApiResponse<AuthorityProfile>>
+
+    @retrofit2.http.DELETE("reports/{id}")
+    suspend fun deleteReport(
+        @Path("id") id: String
+    ): Response<ApiResponse<Any>>
+
+    @POST("issues/{id}/upvote")
+    suspend fun upvoteIssue(
+        @Path("id") id: String
+    ): Response<ApiResponse<Any>>
+
+    @retrofit2.http.DELETE("issues/{id}/upvote")
+    suspend fun removeUpvote(
+        @Path("id") id: String
+    ): Response<ApiResponse<Any>>
+
+    // ============= ADMIN ENDPOINTS =============
+
+    @GET("admin/stats")
+    suspend fun getAdminStats(): Response<ApiResponse<AdminStatsResponse>>
+
+    @GET("admin/audit-logs")
+    suspend fun getAuditLogs(
+        @Query("limit") limit: Int = 50,
+        @Query("offset") offset: Int = 0,
+        @Query("action") action: String? = null
+    ): Response<ApiResponse<AuditLogsResponse>>
 }

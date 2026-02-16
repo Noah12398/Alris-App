@@ -52,6 +52,8 @@ fun MapScreen() {
 
     // API client
     val api = remember { ApiClient.createUserApi(context) }
+    val tokenManager = remember { TokenManager(context) }
+    val userRole by tokenManager.userRoleFlow.collectAsState(initial = null)
 
     // ViewModel
     val viewModel: MapViewModel = viewModel(factory = object : ViewModelProvider.Factory {
@@ -66,13 +68,14 @@ fun MapScreen() {
     var isReportListVisible by remember { mutableStateOf(false) }
     var currentMapType by remember { mutableStateOf(MapType.STANDARD) }
     var showMyLocation by remember { mutableStateOf(true) }
+    var showRateDialog by remember { mutableStateOf(false) }
 
     val mapView = rememberMapViewWithLifecycle(showMyLocation = showMyLocation)
 
     // Load API data on first load
     LaunchedEffect(Unit) {
         viewModel.resetAndReload(
-            userLatitude = 8.8932,
+            userLatitude = 8.8932, // Default center
             userLongitude = 76.6141,
             radiusKm = 10
         )
@@ -115,8 +118,8 @@ fun MapScreen() {
             if (issues.isNotEmpty()) {
                 val first = issues[0]
                 val firstGeo = GeoPoint(first.latitude, first.longitude)
-                mv.controller.setZoom(16.0)
-                mv.controller.setCenter(firstGeo)
+               // mv.controller.setZoom(16.0) // Don't reset zoom aggressively on every update
+                // mv.controller.setCenter(firstGeo)
             }
 
             mv.invalidate()
@@ -159,15 +162,42 @@ fun MapScreen() {
         selectedReport?.let { report ->
             ReportDetailsCard(
                 report = report,
+                userRole = userRole,
                 onDismiss = { selectedReport = null },
                 onNavigate = {
                     val geo = GeoPoint(report.latitude, report.longitude)
                     mapView.controller.animateTo(geo)
                     mapView.controller.setZoom(18.0)
                 },
+                onUpvote = {
+                    viewModel.toggleUpvote(report.id)
+                },
+                isUpvoted = viewModel.upvotedIssueIds.contains(report.id),
+                onRateUser = {
+                    showRateDialog = true
+                },
+                onStatusChange = { newStatus ->
+                    viewModel.updateIssueStatus(report.id, newStatus)
+                },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp)
+            )
+        }
+
+        // Rate User Dialog
+        if (showRateDialog && selectedReport != null) {
+            RateUserDialog(
+                onDismiss = { showRateDialog = false },
+                onSubmit = { rating, comment ->
+                    val userId = selectedReport?.userId
+                    val reportId = selectedReport?.reportId
+                    if (userId != null) {
+                        viewModel.rateUser(userId, rating, comment, reportId)
+                    }
+                    showRateDialog = false
+                    selectedReport = null // Close card after rating? Or keep open?
+                }
             )
         }
 
@@ -365,10 +395,17 @@ fun StatItem(count: Int, label: String, color: Color) {
 @Composable
 fun ReportDetailsCard(
     report: ReportPoint,
+    userRole: String?,
     onDismiss: () -> Unit,
     onNavigate: () -> Unit,
+    onUpvote: () -> Unit,
+    isUpvoted: Boolean = false,
+    onRateUser: () -> Unit,
+    onStatusChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showStatusDropdown by remember { mutableStateOf(false) }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -422,17 +459,138 @@ fun ReportDetailsCard(
             )
 
             Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = onNavigate,
+            
+            // Action Buttons
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Navigate to Location")
+                Button(
+                    onClick = onNavigate,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Navigate")
+                }
+                
+                if (userRole == "citizen") {
+                    Button(
+                        onClick = onUpvote,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isUpvoted) MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f)
+                            else MaterialTheme.colorScheme.secondary
+                        )
+                    ) {
+                        Icon(
+                            if (isUpvoted) Icons.Default.ThumbUp else Icons.Default.ThumbUp,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (isUpvoted) "Upvoted" else "Upvote")
+                    }
+                }
+                
+                if (userRole == "authority" || userRole == "higher_authority") {
+                    Box(modifier = Modifier.weight(1f)) {
+                        Button(
+                            onClick = { showStatusDropdown = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                        ) {
+                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Status")
+                        }
+                        DropdownMenu(
+                            expanded = showStatusDropdown,
+                            onDismissRequest = { showStatusDropdown = false }
+                        ) {
+                            listOf(
+                                "submitted" to "Pending",
+                                "in_progress" to "In Progress",
+                                "resolved" to "Resolved",
+                                "rejected" to "Rejected"
+                            ).forEach { (statusKey, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(label) },
+                                    onClick = {
+                                        onStatusChange(statusKey)
+                                        showStatusDropdown = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Button(
+                        onClick = onRateUser,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                    ) {
+                        Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Rate")
+                    }
+                }
             }
         }
     }
+}
+
+// --- RATE USER DIALOG ---
+@Composable
+fun RateUserDialog(
+    onDismiss: () -> Unit,
+    onSubmit: (Int, String) -> Unit
+) {
+    var rating by remember { mutableStateOf(5) }
+    var comment by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rate Reporter Authenticity") },
+        text = {
+            Column {
+                Text("Rate the reliability of this report/user:", style = MaterialTheme.typography.bodyMedium)
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+                    (1..5).forEach { star ->
+                        Icon(
+                            if (star <= rating) Icons.Default.Star else Icons.Default.StarBorder,
+                            contentDescription = "Star $star",
+                            tint = Color(0xFFFFC107),
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clickable { rating = star }
+                                .padding(4.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = comment,
+                    onValueChange = { comment = it },
+                    label = { Text("Comment (Optional)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onSubmit(rating, comment) }) {
+                Text("Submit Rating")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 // --- REPORTS LIST PANEL ---
@@ -580,10 +738,13 @@ class MapViewModel(private val api: UserApi) : ViewModel() {
                     val data = apiResponse?.data ?: return@launch
 
                     val newIssues = data.issues.map { issue ->
+                        val firstReport = issue.reports?.firstOrNull()
                         ReportPoint(
                             id = issue.issue_id,
+                            userId = firstReport?.user_id,
+                            reportId = firstReport?.report_id,
                             title = "${issue.category ?: "Issue"} #${issue.issue_id.take(8)}",
-                            description = issue.reports?.firstOrNull()?.description ?: "No description",
+                            description = firstReport?.description ?: "No description",
                             latitude = issue.latitude ?: 0.0,
                             longitude = issue.longitude ?: 0.0,
                             category = when (issue.category?.lowercase()) {
@@ -612,6 +773,77 @@ class MapViewModel(private val api: UserApi) : ViewModel() {
                     issues = issues + newIssues
                     hasMore = data.hasMore
                     offset += limit
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    val upvotedIssueIds = mutableStateListOf<String>()
+
+    fun toggleUpvote(issueId: String) {
+        viewModelScope.launch {
+            try {
+                if (upvotedIssueIds.contains(issueId)) {
+                    val response = api.removeUpvote(issueId)
+                    if (response.isSuccessful) {
+                        upvotedIssueIds.remove(issueId)
+                        Log.d("MapViewModel", "Removed upvote from issue $issueId")
+                    } else {
+                        Log.e("MapViewModel", "Failed to remove upvote: ${response.code()}")
+                    }
+                } else {
+                    val response = api.upvoteIssue(issueId)
+                    if (response.isSuccessful) {
+                        upvotedIssueIds.add(issueId)
+                        Log.d("MapViewModel", "Upvoted issue $issueId")
+                    } else {
+                        Log.e("MapViewModel", "Failed to upvote: ${response.code()}")
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun rateUser(userId: String, rating: Int, comment: String?, reportId: String?) {
+        viewModelScope.launch {
+            try {
+                val request = RateUserRequest(rating, comment, reportId)
+                val response = api.rateUser(userId, request)
+                if (response.isSuccessful) {
+                    Log.d("MapViewModel", "Rated user $userId")
+                } else {
+                    Log.e("MapViewModel", "Failed to rate user: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun updateIssueStatus(issueId: String, newStatus: String) {
+        viewModelScope.launch {
+            try {
+                val response = api.updateIssueStatus(StatusUpdate(issueId, newStatus))
+                if (response.isSuccessful) {
+                    // Update local state to reflect change
+                    issues = issues.map {
+                        if (it.id == issueId) {
+                            val newReportStatus = when (newStatus) {
+                                "submitted" -> ReportStatus.PENDING
+                                "in_progress" -> ReportStatus.IN_PROGRESS
+                                "resolved" -> ReportStatus.RESOLVED
+                                "rejected" -> ReportStatus.REJECTED
+                                else -> it.status
+                            }
+                            it.copy(status = newReportStatus)
+                        } else it
+                    }
+                } else {
+                    Log.e("MapViewModel", "Failed to update status: ${response.code()}")
                 }
             } catch (e: Exception) {
                 e.printStackTrace()

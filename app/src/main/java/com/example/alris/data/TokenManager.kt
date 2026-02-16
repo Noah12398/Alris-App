@@ -17,10 +17,14 @@ class TokenManager(private val context: Context) {
         private val Context.dataStore by preferencesDataStore("auth_prefs")
         val ACCESS_TOKEN = stringPreferencesKey("accessToken")
         val REFRESH_TOKEN = stringPreferencesKey("refreshToken")
+        val USER_ROLE = stringPreferencesKey("userRole")
 
     }
     val accessTokenFlow: Flow<String?> = context.dataStore.data.map { prefs ->
         prefs[ACCESS_TOKEN]
+    }
+    val userRoleFlow: Flow<String?> = context.dataStore.data.map { prefs ->
+        prefs[USER_ROLE]
     }
     suspend fun saveAccessToken(token: String) {
         context.dataStore.edit { prefs ->
@@ -32,10 +36,17 @@ class TokenManager(private val context: Context) {
             prefs[REFRESH_TOKEN] = token
         }
     }
+    suspend fun saveUserRole(role: String) {
+        context.dataStore.edit { prefs ->
+            prefs[USER_ROLE] = role
+        }
+    }
 
     suspend fun clearToken() {
         context.dataStore.edit { prefs ->
             prefs.remove(ACCESS_TOKEN)
+            prefs.remove(REFRESH_TOKEN)
+            prefs.remove(USER_ROLE)
         }
     }
 }

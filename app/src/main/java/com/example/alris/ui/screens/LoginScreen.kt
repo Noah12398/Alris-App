@@ -174,6 +174,7 @@ fun LoginScreen(
                                 "authority" -> "authority"
                                 else -> "user"
                             }
+                            tokenManager.saveUserRole(mappedRole)
 
                             withContext(Dispatchers.Main) {
                                 Toast.makeText(context, "Login Successful!", Toast.LENGTH_LONG).show()

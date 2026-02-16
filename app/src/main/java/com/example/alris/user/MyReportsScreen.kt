@@ -26,6 +26,7 @@ import coil.request.ImageRequest
 import com.example.alris.data.ApiClient
 import com.example.alris.data.MyReportItem
 import com.example.alris.data.IssueSummary
+import kotlinx.coroutines.launch
 import retrofit2.HttpException
 import java.time.format.DateTimeFormatter
 import java.time.ZonedDateTime
@@ -39,6 +40,9 @@ fun MyReportsScreen() {
     var reports by remember { mutableStateOf<List<MyReportItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+    var reportToDelete by remember { mutableStateOf<MyReportItem?>(null) }
+    var deleteError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         try {
@@ -140,18 +144,67 @@ fun MyReportsScreen() {
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        items(reports) { report ->
-                            ReportCard(report)
+                        items(reports, key = { it.id }) { report ->
+                            ReportCard(
+                                report = report,
+                                onDelete = { reportToDelete = report }
+                            )
                         }
                     }
                 }
             }
         }
+
+        // Delete confirmation dialog
+        reportToDelete?.let { report ->
+            AlertDialog(
+                onDismissRequest = { reportToDelete = null; deleteError = null },
+                icon = { Icon(Icons.Default.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                title = { Text("Delete Report?") },
+                text = {
+                    Column {
+                        Text("This action cannot be undone. The report and its uploads will be permanently removed.")
+                        deleteError?.let {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                try {
+                                    val response = api.deleteReport(report.id)
+                                    if (response.isSuccessful) {
+                                        reports = reports.filter { it.id != report.id }
+                                        reportToDelete = null
+                                        deleteError = null
+                                    } else {
+                                        deleteError = "Failed: ${response.code()}"
+                                    }
+                                } catch (e: Exception) {
+                                    deleteError = "Error: ${e.message}"
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Delete")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { reportToDelete = null; deleteError = null }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
     }
 }
 
 @Composable
-fun ReportCard(report: MyReportItem) {
+fun ReportCard(report: MyReportItem, onDelete: () -> Unit) {
     val context = LocalContext.current
     var formattedDate = remember(report.created_at) {
         try {
@@ -249,6 +302,18 @@ fun ReportCard(report: MyReportItem) {
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Spacer(modifier = Modifier.weight(1f))
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Delete report",
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }

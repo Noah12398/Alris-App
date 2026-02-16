@@ -32,6 +32,7 @@ class HigherAuthorityDashboardActivity : ComponentActivity() {
                             composable("map") { MapScreen() }
                             composable("department issues") { DepartmentIssuesScreen() }
                             composable("approval") { ApprovalScreen() }
+                            composable("flagged_users") { FlaggedUsersScreen() }
                             composable("settings") { SettingsScreen() }
                         }
                     }

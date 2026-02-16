@@ -21,6 +21,7 @@ import com.example.alris.SettingsScreen
 import com.example.alris.data.ApiClient
 import com.example.alris.data.UpdateAuthorityProfileRequest
 import com.example.alris.ui.theme.AlrisTheme
+import com.example.alris.user.MapScreen
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -34,14 +35,15 @@ class LowerAuthorityDashboardActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 Scaffold(
                     bottomBar = {
-                        HigherAuthorityBottomNavigationBar(navController)
+                        LowerAuthorityBottomNavigationBar(navController)
                     }
                 ) { padding ->
                     Box(modifier = Modifier.padding(padding)) {
                         val initialSetup = intent.getBooleanExtra("initialSetup", false)
-                        val startDest = if (initialSetup) "profile" else "settings"
+                        val startDest = if (initialSetup) "profile" else "map"
 
                         NavHost(navController = navController, startDestination = startDest) {
+                            composable("map") { MapScreen() }
                             composable("settings") { SettingsScreen() }
                             composable("profile") {
                                 val context = LocalContext.current
@@ -68,7 +70,7 @@ class LowerAuthorityDashboardActivity : ComponentActivity() {
                                                 withContext(Dispatchers.Main) {
                                                     loading = false
                                                     if (response.isSuccessful && response.body()?.success == true) {
-                                                        nav.navigate("settings") {
+                                                        nav.navigate("map") {
                                                             popUpTo(navController.graph.startDestinationId) { inclusive = true }
                                                             launchSingleTop = true
                                                         }

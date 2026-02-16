@@ -139,6 +139,8 @@ data class IssueItem(
 // ============= UI MODELS (for displaying in app) =============
 data class ReportPoint(
     val id: String,
+    val userId: String?, // For Authority to rate user
+    val reportId: String?, // For Authority to rate specific report
     val title: String,
     val description: String,
     val category: ReportCategory,
@@ -342,7 +344,7 @@ data class NotificationItem(
     val id: String,
     val recipientId: String,
     val title: String,
-    val body: String,
+    val message: String, // Backend schema field is "message", not "body"
     val type: String?, // "status_update", "system", etc.
     val isRead: Boolean,
     val createdAt: String
@@ -350,4 +352,95 @@ data class NotificationItem(
 
 data class UnreadCountResponse(
     val unreadCount: Int
+)
+
+// ============= RATINGS & FLAGGED USERS MODELS =============
+
+data class RateUserRequest(
+    val rating: Int,
+    val comment: String? = null,
+    val reportId: String? = null
+)
+
+data class UserRating(
+    val id: String,
+    val userId: String,
+    val ratedBy: String,
+    val ratedByRole: String,
+    val rating: Int,
+    val comment: String?,
+    val reportId: String?,
+    val createdAt: String? // Backend Drizzle propery is camelCase
+)
+
+data class UserRatingsResponse(
+    val user: BackendUser,
+    val ratings: List<UserRating>,
+    val totalRatings: Int
+)
+
+data class FlaggedUser(
+    val id: String,
+    val name: String,
+    val email: String,
+    val phone: String? = null,
+    val trustScore: Double,
+    val isFlagged: Boolean,
+    val totalReports: Int,
+    val createdAt: String? // Backend Drizzle property
+)
+
+data class FlaggedUsersResponse(
+    val users: List<FlaggedUser>,
+    val total: Int,
+    val limit: Int,
+    val offset: Int,
+    val hasMore: Boolean
+)
+
+// ============= AUTHORITY PROFILE MODEL =============
+
+data class AuthorityProfile(
+    val id: String,
+    val name: String?,
+    val email: String,
+    val phone: String?,
+    val department: String,
+    val is_initialized: Boolean, // Backend raw SQL returns snake_case
+    val created_at: String,
+    val updated_at: String
+)
+
+// ============= ADMIN MODELS =============
+
+data class AdminStatsResponse(
+    val totalUsers: Int,
+    val totalReports: Int,
+    val totalIssues: Int,
+    val classifiedReports: Int,
+    val unclassifiedReports: Int,
+    val flaggedUsers: Int,
+    val fakeUploads: Int,
+    val spamUploads: Int,
+    val issuesByStatus: Map<String, Int>? = null
+)
+
+data class AuditLogItem(
+    val id: String,
+    val actorId: String,
+    val actorRole: String,
+    val action: String,
+    val entityType: String,
+    val entityId: String,
+    val metadata: String? = null,
+    val ipAddress: String? = null,
+    val createdAt: String
+)
+
+data class AuditLogsResponse(
+    val logs: List<AuditLogItem>,
+    val total: Int,
+    val limit: Int,
+    val offset: Int,
+    val hasMore: Boolean
 )

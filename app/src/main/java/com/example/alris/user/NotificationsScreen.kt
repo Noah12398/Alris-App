@@ -84,7 +84,7 @@ fun NotificationsScreen() {
                         modifier = Modifier.size(32.dp)
                     )
                     Spacer(modifier = Modifier.width(16.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Notifications",
                             style = MaterialTheme.typography.titleLarge,
@@ -97,6 +97,27 @@ fun NotificationsScreen() {
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                    val unreadCount = notifications.count { !it.isRead }
+                    if (unreadCount > 0) {
+                        TextButton(
+                            onClick = {
+                                scope.launch {
+                                    try {
+                                        val res = api.markAllAsRead()
+                                        if (res.isSuccessful) {
+                                            notifications = notifications.map { it.copy(isRead = true) }
+                                        }
+                                    } catch (_: Exception) { }
+                                }
+                            }
+                        ) {
+                            Text(
+                                "Mark All Read",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }
@@ -209,7 +230,7 @@ fun NotificationCard(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = notification.body,
+                    text = notification.message,
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
