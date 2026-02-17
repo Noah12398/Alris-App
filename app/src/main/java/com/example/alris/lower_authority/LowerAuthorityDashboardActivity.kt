@@ -65,45 +65,8 @@ class LowerAuthorityDashboardActivity : ComponentActivity() {
                             }
                             composable("settings") { SettingsScreen() }
                             composable("profile") {
-                                val context = LocalContext.current
-                                val api = remember { ApiClient.createUserApi(context) }
-                                var loading by remember { mutableStateOf(false) }
-                                val nav = navController
+                                LowerAuthorityProfileScreen()
 
-                                AuthorityProfileSetupScreen(
-                                    isLoading = loading,
-                                    onSubmit = { name, phone, lat, lon, pass ->
-                                        loading = true
-
-                                        CoroutineScope(Dispatchers.IO).launch {
-                                            try {
-                                                val body = UpdateAuthorityProfileRequest(
-                                                    name,
-                                                    phone,
-                                                    lat,
-                                                    lon,
-                                                    pass
-                                                )
-                                                val response = api.updateAuthorityProfile(body)
-
-                                                withContext(Dispatchers.Main) {
-                                                    loading = false
-                                                    if (response.isSuccessful && response.body()?.success == true) {
-                                                        nav.navigate("map") {
-                                                            popUpTo(navController.graph.startDestinationId) { inclusive = true }
-                                                            launchSingleTop = true
-                                                        }
-                                                    } else {
-                                                        Log.e("PROFILE_UPDATE", "Failed: ${response.body()?.error ?: response.message()}")
-                                                    }
-                                                }
-                                            } catch (e: Exception) {
-                                                Log.e("PROFILE_UPDATE", "Failed: ${e.message}")
-                                                withContext(Dispatchers.Main) { loading = false }
-                                            }
-                                        }
-                                    }
-                                )
                             }
                         }
                     }

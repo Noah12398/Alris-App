@@ -309,6 +309,20 @@ data class UpdateAuthorityProfileRequest(
     val newPassword: String?
 )
 
+// Authority profile model for getAuthorityProfile API
+data class AuthorityProfile(
+    val id: String,
+    val name: String? = null,
+    val email: String,
+    val phone: String? = null,
+    val department: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val isInitialized: Boolean = false,
+    val role: String? = null,
+    val createdAt: String? = null
+)
+
 // Inside { success: true, data: { id, name, email, ... } }
 data class UpdateAuthorityProfileResponse(
     val id: String? = null,
@@ -422,22 +436,6 @@ data class FlaggedUsersResponse(
     val limit: Int,
     val offset: Int,
     val hasMore: Boolean
-)
-
-// ============= AUTHORITY PROFILE MODEL =============
-
-data class AuthorityProfile(
-    val id: String,
-    val name: String?,
-    val email: String,
-    val phone: String?,
-    val department: String,
-    val is_initialized: Boolean? = null,
-    val created_at: String,
-    val updated_at: String? = null,
-    val latitude: Double? = null,
-    val longitude: Double? = null,
-    val role: String? = null
 )
 
 // ============= ADMIN MODELS =============

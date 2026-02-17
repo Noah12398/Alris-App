@@ -69,6 +69,9 @@ interface UserApi {
     @GET("issues/{issueId}")
     suspend fun getIssueById(@Path("issueId") issueId: String): Response<ApiResponse<IssueDetailResponse>>
 
+    @GET("authority/profile")
+    suspend fun getAuthorityProfile(): Response<ApiResponse<AuthorityProfile>>
+
     @POST("authority/register-lower")
     suspend fun registerLowerAuthority(
         @Body body: RegisterLowerAuthorityRequest
@@ -130,9 +133,6 @@ interface UserApi {
         @Query("limit") limit: Int = 50,
         @Query("offset") offset: Int = 0
     ): Response<ApiResponse<FlaggedUsersResponse>>
-
-    @GET("authority/profile")
-    suspend fun getAuthorityProfile(): Response<ApiResponse<AuthorityProfile>>
 
     @retrofit2.http.DELETE("reports/{id}")
     suspend fun deleteReport(

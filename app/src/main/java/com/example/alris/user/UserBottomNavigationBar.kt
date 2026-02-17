@@ -14,7 +14,6 @@ fun UserBottomNavigationBar(navController: NavHostController) {
         BottomNavItem("map", "Map", Icons.Default.Map),
         BottomNavItem("camera", "Report", Icons.Default.CameraAlt),
         BottomNavItem("my_reports", "My Reports", Icons.Default.ListAlt),
-        BottomNavItem("notifications", "Alerts", Icons.Default.Notifications),
         BottomNavItem("profile", "Profile", Icons.Default.Person)
     )
 

@@ -29,7 +29,6 @@ class UserDashboardActivity : ComponentActivity() {
                             composable("map") { MapScreen() }
                             composable("camera") { MultiPhotoCameraScreen() }
                             composable("my_reports") { MyReportsScreen() }
-                            composable("notifications") { NotificationsScreen() }
                             composable("profile") { UserProfileScreen(onBack = { navController.popBackStack() }) }
                             composable("settings") { SettingsScreen() }
                         }

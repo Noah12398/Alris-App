@@ -227,7 +227,7 @@ fun AuthorityProfileScreen(navController: NavController) {
                             if (data.role == "authority") {
                                 ProfileDetailItem(Icons.Default.LocationOn, "Location", "${data.latitude ?: 0.0}, ${data.longitude ?: 0.0}")
                             }
-                            ProfileDetailItem(Icons.Default.CalendarToday, "Joined", try { data.created_at.substringBefore("T") } catch(e:Exception){ data.created_at })
+                            ProfileDetailItem(Icons.Default.CalendarToday, "Joined", data.createdAt?.substringBefore("T") ?: "Unknown")
                             
                             Spacer(modifier = Modifier.weight(1f))
                             
