@@ -1,4 +1,4 @@
-package com.example.alris.user
+package com.example.alris.authority
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -7,7 +7,6 @@ import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,11 +19,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,33 +31,31 @@ import androidx.lifecycle.*
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.alris.Constants.logoutAndGoToLogin
 import com.example.alris.data.*
+import com.example.alris.user.MapTopControls
+import com.example.alris.user.MapType
+import com.example.alris.user.StatusBadge
+import com.example.alris.user.rememberMapViewWithLifecycle
 import kotlinx.coroutines.launch
-import org.osmdroid.config.Configuration
-import org.osmdroid.tileprovider.tilesource.ITileSource
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
-import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
-import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
-// --- MAIN MAP SCREEN ---
+// --- AUTHORITY MAP SCREEN ---
 @SuppressLint("MissingPermission")
 @Composable
-fun MapScreen() {
+fun AuthorityMapScreen() {
     val context = LocalContext.current
 
     // API client
-    val api = remember { ApiClient.createUserApi(context) }
-    val tokenManager = remember { TokenManager(context) }
+    val api = remember<UserApi> { ApiClient.createUserApi(context) }
+    val tokenManager = remember<TokenManager> { TokenManager(context) }
+    // We know this is an authority, so we can default to that or still check
     val userRole by tokenManager.userRoleFlow.collectAsState(initial = null)
 
-
     // ViewModel
-    val viewModel: MapViewModel = viewModel(factory = object : ViewModelProvider.Factory {
+    val viewModel: AuthorityMapViewModel = viewModel(factory = object : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             @Suppress("UNCHECKED_CAST")
-            return MapViewModel(api) as T
+            return AuthorityMapViewModel(api) as T
         }
     })
 
@@ -74,12 +69,15 @@ fun MapScreen() {
     val mapView = rememberMapViewWithLifecycle(showMyLocation = showMyLocation)
 
     // Load API data on first load
-    LaunchedEffect(Unit) {
-        viewModel.resetAndReload(
-            userLatitude = 8.8932, // Default center
-            userLongitude = 76.6141,
-            radiusKm = 10
-        )
+    LaunchedEffect(userRole) {
+        if (userRole != null) {
+            viewModel.resetAndReload(
+                userRole = userRole,
+                userLatitude = 8.8932, // Default center
+                userLongitude = 76.6141,
+                radiusKm = 20 // Authorities might want a wider range
+            )
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -88,15 +86,12 @@ fun MapScreen() {
             factory = { mapView },
             modifier = Modifier.fillMaxSize()
         ) { mv ->
-            // Update tile source if map type changed
             if (mv.tileProvider.tileSource != currentMapType.tileSource) {
                 mv.setTileSource(currentMapType.tileSource)
             }
 
-            // Clear previous markers (keep location overlay)
             mv.overlays.removeAll { it is Marker }
 
-            // Add markers for all issues
             issues.forEach { report ->
                 val geo = GeoPoint(report.latitude, report.longitude)
                 val marker = Marker(mv).apply {
@@ -114,15 +109,6 @@ fun MapScreen() {
                 }
                 mv.overlays.add(marker)
             }
-
-            // Center map on first marker
-            if (issues.isNotEmpty()) {
-                val first = issues[0]
-                val firstGeo = GeoPoint(first.latitude, first.longitude)
-               // mv.controller.setZoom(16.0) // Don't reset zoom aggressively on every update
-                // mv.controller.setCenter(firstGeo)
-            }
-
             mv.invalidate()
         }
 
@@ -151,8 +137,8 @@ fun MapScreen() {
             Icon(Icons.Default.ExitToApp, contentDescription = "Logout")
         }
 
-        // Statistics Card
-        MapStatsCard(
+        // Stats Card
+        AuthorityMapStatsCard(
             reportPoints = issues,
             modifier = Modifier
                 .align(Alignment.TopEnd)
@@ -161,20 +147,14 @@ fun MapScreen() {
 
         // Report Details Bottom Sheet
         selectedReport?.let { report ->
-            ReportDetailsCard(
+            AuthorityReportDetailsCard(
                 report = report,
-                userRole = userRole,
                 onDismiss = { selectedReport = null },
                 onNavigate = {
                     val geo = GeoPoint(report.latitude, report.longitude)
                     mapView.controller.animateTo(geo)
                     mapView.controller.setZoom(18.0)
                 },
-                onUpvote = {
-                    viewModel.toggleUpvote(report.id)
-                },
-                isUpvoted = report.isUpvoted,
-                upvoteCount = report.upvoteCount,
                 onRateUser = {
                     showRateDialog = true
                 },
@@ -198,7 +178,6 @@ fun MapScreen() {
                         viewModel.rateUser(userId, rating, comment, reportId)
                     }
                     showRateDialog = false
-                    selectedReport = null // Close card after rating? Or keep open?
                 }
             )
         }
@@ -206,17 +185,14 @@ fun MapScreen() {
         // Reports List Side Panel
         AnimatedVisibility(
             visible = isReportListVisible,
-            enter = slideInHorizontally(
-                initialOffsetX = { -it },
-                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)
-            ) + fadeIn(),
+            enter = slideInHorizontally(initialOffsetX = { -it }) + fadeIn(),
             exit = slideOutHorizontally(targetOffsetX = { -it }) + fadeOut(),
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .fillMaxHeight()
                 .width(320.dp)
         ) {
-            ReportsListPanel(
+            AuthorityReportsListPanel(
                 reports = issues,
                 onReportClick = { report ->
                     selectedReport = report
@@ -230,117 +206,22 @@ fun MapScreen() {
                     .padding(16.dp)
             )
         }
-
-        // FAB for adding new report
-        FloatingActionButton(
-            onClick = { /* Add new report */ },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp),
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "Add Report", modifier = Modifier.size(24.dp))
-        }
     }
 
-    // Auto-pagination
     if (viewModel.hasMore) {
         LaunchedEffect(issues.size) {
-            viewModel.loadNearbyIssues()
+            viewModel.loadIssues(userRole)
         }
     }
 }
-// --- GET MARKER ICON ---
+
+// --- HELPER FUNCTIONS & COMPOSABLES ---
+
 private fun getMarkerIcon(context: Context, category: ReportCategory, status: ReportStatus): Drawable? =
     ContextCompat.getDrawable(context, android.R.drawable.ic_menu_mylocation)
 
-// --- TOP CONTROLS ---
 @Composable
-fun MapTopControls(
-    currentMapType: MapType,
-    onMapTypeChange: (MapType) -> Unit,
-    showMyLocation: Boolean,
-    onLocationToggle: (Boolean) -> Unit,
-    onReportListToggle: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Reports List Button
-        FloatingActionButton(
-            onClick = onReportListToggle,
-            modifier = Modifier.size(48.dp),
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.onSurface
-        ) {
-            Icon(
-                Icons.Default.List,
-                contentDescription = "Reports List",
-                modifier = Modifier.size(20.dp)
-            )
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            // Map Type Selector
-            Card(
-                modifier = Modifier.shadow(4.dp, RoundedCornerShape(12.dp)),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(modifier = Modifier.padding(4.dp)) {
-                    MapType.values().forEach { type ->
-                        val isSelected = currentMapType == type
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.primary
-                                    else Color.Transparent
-                                )
-                                .clickable { onMapTypeChange(type) }
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = type.displayName,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary
-                                else MaterialTheme.colorScheme.onSurface,
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    }
-                }
-            }
-
-            // My Location Button
-            FloatingActionButton(
-                onClick = { onLocationToggle(!showMyLocation) },
-                modifier = Modifier.size(48.dp),
-                containerColor = if (showMyLocation) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.surface,
-                contentColor = if (showMyLocation) MaterialTheme.colorScheme.onPrimary
-                else MaterialTheme.colorScheme.onSurface
-            ) {
-                Icon(
-                    Icons.Default.MyLocation,
-                    contentDescription = "My Location",
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-    }
-}
-
-// --- STATS CARD ---
-@Composable
-fun MapStatsCard(
+fun AuthorityMapStatsCard(
     reportPoints: List<ReportPoint>,
     modifier: Modifier = Modifier
 ) {
@@ -360,21 +241,22 @@ fun MapStatsCard(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Reports",
+                text = "Department Overview",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            StatItem(pendingCount, "Pending", MaterialTheme.colorScheme.error)
-            StatItem(inProgressCount, "In Progress", MaterialTheme.colorScheme.tertiary)
-            StatItem(resolvedCount, "Resolved", Color.Green)
+            // Reusing StatItem from somewhere? Or just define locally if small
+            AuthorityStatItem(pendingCount, "Pending", MaterialTheme.colorScheme.error)
+            AuthorityStatItem(inProgressCount, "In Progress", MaterialTheme.colorScheme.tertiary)
+            AuthorityStatItem(resolvedCount, "Resolved", Color(0xFF4CAF50))
         }
     }
 }
 
 @Composable
-fun StatItem(count: Int, label: String, color: Color) {
+fun AuthorityStatItem(count: Int, label: String, color: Color) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.padding(vertical = 2.dp)
@@ -393,16 +275,11 @@ fun StatItem(count: Int, label: String, color: Color) {
     }
 }
 
-// --- REPORT DETAILS CARD ---
 @Composable
-fun ReportDetailsCard(
+fun AuthorityReportDetailsCard(
     report: ReportPoint,
-    userRole: String?,
     onDismiss: () -> Unit,
     onNavigate: () -> Unit,
-    onUpvote: () -> Unit,
-    isUpvoted: Boolean = false,
-    upvoteCount: Int = 0,
     onRateUser: () -> Unit,
     onStatusChange: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -462,7 +339,7 @@ fun ReportDetailsCard(
             )
 
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             // Action Buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -477,74 +354,53 @@ fun ReportDetailsCard(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Navigate")
                 }
-                
-                if (userRole == "user" || userRole == "citizen") {
+
+                // Status Update
+                Box(modifier = Modifier.weight(1f)) {
                     Button(
-                        onClick = onUpvote,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isUpvoted) MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f)
-                            else MaterialTheme.colorScheme.secondary
-                        )
+                        onClick = { showStatusDropdown = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
                     ) {
-                        Icon(
-                            if (isUpvoted) Icons.Default.ThumbUp else Icons.Default.ThumbUp,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(if (isUpvoted) "Upvoted ($upvoteCount)" else "Upvote ($upvoteCount)")
+                        Text("Status")
+                    }
+                    DropdownMenu(
+                        expanded = showStatusDropdown,
+                        onDismissRequest = { showStatusDropdown = false }
+                    ) {
+                        listOf(
+                            "submitted" to "Pending",
+                            "in_progress" to "In Progress",
+                            "resolved" to "Resolved",
+                            "rejected" to "Rejected"
+                        ).forEach { (statusKey, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = {
+                                    onStatusChange(statusKey)
+                                    showStatusDropdown = false
+                                }
+                            )
+                        }
                     }
                 }
-                
-                if (userRole == "authority" || userRole == "higher_authority") {
-                    Box(modifier = Modifier.weight(1f)) {
-                        Button(
-                            onClick = { showStatusDropdown = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
-                        ) {
-                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Status")
-                        }
-                        DropdownMenu(
-                            expanded = showStatusDropdown,
-                            onDismissRequest = { showStatusDropdown = false }
-                        ) {
-                            listOf(
-                                "submitted" to "Pending",
-                                "in_progress" to "In Progress",
-                                "resolved" to "Resolved",
-                                "rejected" to "Rejected"
-                            ).forEach { (statusKey, label) ->
-                                DropdownMenuItem(
-                                    text = { Text(label) },
-                                    onClick = {
-                                        onStatusChange(statusKey)
-                                        showStatusDropdown = false
-                                    }
-                                )
-                            }
-                        }
-                    }
 
-                    Button(
-                        onClick = onRateUser,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                    ) {
-                        Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Rate")
-                    }
+                Button(
+                    onClick = onRateUser,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                ) {
+                    Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Rate")
                 }
             }
         }
     }
 }
 
-// --- RATE USER DIALOG ---
 @Composable
 fun RateUserDialog(
     onDismiss: () -> Unit,
@@ -596,9 +452,8 @@ fun RateUserDialog(
     )
 }
 
-// --- REPORTS LIST PANEL ---
 @Composable
-fun ReportsListPanel(
+fun AuthorityReportsListPanel(
     reports: List<ReportPoint>,
     onReportClick: (ReportPoint) -> Unit,
     onClose: () -> Unit,
@@ -615,7 +470,7 @@ fun ReportsListPanel(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Reports", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Open Issues", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 IconButton(onClick = onClose) {
                     Icon(Icons.Default.Close, contentDescription = "Close", modifier = Modifier.size(20.dp))
                 }
@@ -629,7 +484,7 @@ fun ReportsListPanel(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(reports) { report ->
-                    ReportListItem(report = report, onClick = { onReportClick(report) })
+                    AuthorityReportListItem(report = report, onClick = { onReportClick(report) })
                 }
             }
         }
@@ -637,7 +492,7 @@ fun ReportsListPanel(
 }
 
 @Composable
-fun ReportListItem(report: ReportPoint, onClick: () -> Unit) {
+fun AuthorityReportListItem(report: ReportPoint, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
         colors = CardDefaults.cardColors(
@@ -660,57 +515,8 @@ fun ReportListItem(report: ReportPoint, onClick: () -> Unit) {
     }
 }
 
-// --- REMEMBER MAPVIEW WITH LIFECYCLE ---
-@Composable
-fun rememberMapViewWithLifecycle(showMyLocation: Boolean = false): MapView {
-    val context = LocalContext.current
-
-    // Load OsmDroid config
-    Configuration.getInstance().load(
-        context,
-        context.getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
-    )
-    Configuration.getInstance().userAgentValue = context.packageName
-
-    val mapView = remember {
-        MapView(context).apply {
-
-            // Set map source (default: MAPNIK)
-            setTileSource(TileSourceFactory.MAPNIK)
-            setMultiTouchControls(true)
-
-            // FIX: Avoid zoomed-out default view
-            controller.setZoom(17.0)  // Good city-level zoom
-            controller.setCenter(GeoPoint(8.8932, 76.6141))  // Initial center
-
-            // Optional: My location overlay
-            if (showMyLocation) {
-                val overlay = MyLocationNewOverlay(GpsMyLocationProvider(context), this)
-                overlay.enableMyLocation()
-                overlays.add(overlay)
-            }
-        }
-    }
-
-    // Lifecycle handler
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    DisposableEffect(lifecycle) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> mapView.onResume()
-                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
-                else -> {}
-            }
-        }
-        lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer) }
-    }
-
-    return mapView
-}
-
 // --- VIEWMODEL ---
-class MapViewModel(private val api: UserApi) : ViewModel() {
+class AuthorityMapViewModel(private val api: UserApi) : ViewModel() {
     var issues by mutableStateOf<List<ReportPoint>>(emptyList())
         private set
     var hasMore by mutableStateOf(false)
@@ -718,113 +524,107 @@ class MapViewModel(private val api: UserApi) : ViewModel() {
     private var offset = 0
     private val limit = 50
     private var currentRadiusKm: Int = 10
-    private var currentUserLatitude: Double? = null
-    private var currentUserLongitude: Double? = null
 
-    fun loadNearbyIssues(
-        radiusKm: Int = currentRadiusKm,
-        userLatitude: Double? = currentUserLatitude,
-        userLongitude: Double? = currentUserLongitude
+    fun loadIssues(
+        userRole: String?,
+        radiusKm: Int = currentRadiusKm
     ) {
         viewModelScope.launch {
             try {
-                val response = api.getNearbyIssues(
-                    latitude = userLatitude,
-                    longitude = userLongitude,
-                    radius = radiusKm,
-                    limit = limit,
-                    offset = offset
-                )
+                if (userRole == "higher" || userRole == "higher_authority") {
+                    // Fetch Department Issues
+                    val response = api.getDepartmentIssues(
+                        limit = limit,
+                        offset = offset
+                    )
+                    if (response.isSuccessful) {
+                        val apiResponse = response.body()
+                        val data = apiResponse?.data ?: return@launch
 
-                if (response.isSuccessful) {
-                    val apiResponse = response.body()
-                    val data = apiResponse?.data ?: return@launch
-
-                    val newIssues = data.issues.map { issue ->
-                        val firstReport = issue.reports?.firstOrNull()
-                        ReportPoint(
-                            id = issue.issue_id,
-                            userId = firstReport?.user_id,
-                            reportId = firstReport?.report_id,
-                            title = "${issue.category ?: "Issue"} #${issue.issue_id.take(8)}",
-                            description = firstReport?.description ?: "No description",
-                            latitude = issue.latitude ?: 0.0,
-                            longitude = issue.longitude ?: 0.0,
-                            category = when (issue.category?.lowercase()) {
-                                "drainage" -> ReportCategory.DRAINAGE
-                                "lighting" -> ReportCategory.LIGHTING
-                                "waste", "garbage" -> ReportCategory.WASTE
-                                "road" -> ReportCategory.ROAD
-                                "water" -> ReportCategory.WATER
-                                "electricity" -> ReportCategory.ELECTRICITY
-                                else -> ReportCategory.OTHER
-                            },
-                            status = when (issue.status?.lowercase()) {
-                                "submitted" -> ReportStatus.PENDING
-                                "in_progress" -> ReportStatus.IN_PROGRESS
-                                "approved" -> ReportStatus.APPROVED
-                                "rejected" -> ReportStatus.REJECTED
-                                "resolved" -> ReportStatus.RESOLVED
-                                else -> ReportStatus.PENDING
-                            },
-                            distance_meters = issue.distance_meters ?: 0.0,
-                            distance_km = issue.distance_km ?: 0.0,
-                            created_at = issue.created_at ?: "",
-                            isUpvoted = issue.is_upvoted == true,
-                            upvoteCount = issue.upvote_count ?: 0
-                        )
+                        val newIssues = data.issues.map { issue ->
+                            val firstReport = issue.reports.firstOrNull()
+                            ReportPoint(
+                                id = issue.issue_id,
+                                userId = firstReport?.user_id,
+                                reportId = firstReport?.report_id,
+                                title = "${issue.category ?: "Issue"} #${issue.issue_id.take(8)}",
+                                description = firstReport?.description ?: "No description",
+                                latitude = issue.latitude ?: 0.0,
+                                longitude = issue.longitude ?: 0.0,
+                                category = mapCategory(issue.category),
+                                status = mapStatus(issue.status),
+                                distance_meters = 0.0, // Not provided in department issues
+                                distance_km = 0.0,
+                                created_at = issue.created_at ?: ""
+                            )
+                        }
+                        issues = issues + newIssues
+                        hasMore = data.hasMore ?: false
+                        offset += limit
                     }
-
-                    issues = issues + newIssues
-                    hasMore = data.hasMore
-                    offset += limit
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-
-    fun toggleUpvote(issueId: String) {
-        viewModelScope.launch {
-            val issueIndex = issues.indexOfFirst { it.id == issueId }
-            if (issueIndex == -1) return@launch
-
-            val issue = issues[issueIndex]
-            val originalState = issue
-
-            // Optimistic update
-            val newIsUpvoted = !issue.isUpvoted
-            val newCount = if (newIsUpvoted) issue.upvoteCount + 1 else maxOf(0, issue.upvoteCount - 1)
-            
-            issues = issues.toMutableList().apply {
-                this[issueIndex] = issue.copy(isUpvoted = newIsUpvoted, upvoteCount = newCount)
-            }
-
-            try {
-                val response = if (newIsUpvoted) {
-                    api.upvoteIssue(issueId)
                 } else {
-                    api.removeUpvote(issueId)
-                }
+                    // Fetch Nearby Issues (Lower Authority)
+                    val response = api.getNearbyIssues(
+                        radius = radiusKm,
+                        limit = limit,
+                        offset = offset
+                    )
 
-                if (!response.isSuccessful) {
-                    // Revert on failure
-                    issues = issues.toMutableList().apply {
-                        this[issueIndex] = originalState
+                    if (response.isSuccessful) {
+                        val apiResponse = response.body()
+                        val data = apiResponse?.data ?: return@launch
+
+                        val newIssues = data.issues.map { issue ->
+                            val firstReport = issue.reports?.firstOrNull()
+                            ReportPoint(
+                                id = issue.issue_id,
+                                userId = firstReport?.user_id,
+                                reportId = firstReport?.report_id,
+                                title = "${issue.category ?: "Issue"} #${issue.issue_id.take(8)}",
+                                description = firstReport?.description ?: "No description",
+                                latitude = issue.latitude ?: 0.0,
+                                longitude = issue.longitude ?: 0.0,
+                                category = mapCategory(issue.category),
+                                status = mapStatus(issue.status),
+                                distance_meters = issue.distance_meters ?: 0.0,
+                                distance_km = issue.distance_km ?: 0.0,
+                                created_at = issue.created_at ?: ""
+                            )
+                        }
+
+                        issues = issues + newIssues
+                        hasMore = data.hasMore
+                        offset += limit
                     }
-                    Log.e("MapViewModel", "Failed to toggle upvote: ${response.code()}")
                 }
             } catch (e: Exception) {
-                // Revert on error
-                issues = issues.toMutableList().apply {
-                    this[issueIndex] = originalState
-                }
                 e.printStackTrace()
             }
         }
     }
 
+    private fun mapCategory(category: String?): ReportCategory {
+        return when (category?.lowercase()) {
+            "drainage" -> ReportCategory.DRAINAGE
+            "lighting" -> ReportCategory.LIGHTING
+            "waste", "garbage" -> ReportCategory.WASTE
+            "road" -> ReportCategory.ROAD
+            "water" -> ReportCategory.WATER
+            "electricity" -> ReportCategory.ELECTRICITY
+            else -> ReportCategory.OTHER
+        }
+    }
+
+    private fun mapStatus(status: String?): ReportStatus {
+        return when (status?.lowercase()) {
+            "submitted" -> ReportStatus.PENDING
+            "in_progress" -> ReportStatus.IN_PROGRESS
+            "approved" -> ReportStatus.APPROVED
+            "rejected" -> ReportStatus.REJECTED
+            "resolved" -> ReportStatus.RESOLVED
+            else -> ReportStatus.PENDING
+        }
+    }
 
     fun rateUser(userId: String, rating: Int, comment: String?, reportId: String?) {
         viewModelScope.launch {
@@ -832,9 +632,9 @@ class MapViewModel(private val api: UserApi) : ViewModel() {
                 val request = RateUserRequest(rating, comment, reportId)
                 val response = api.rateUser(userId, request)
                 if (response.isSuccessful) {
-                    Log.d("MapViewModel", "Rated user $userId")
+                    Log.d("AuthorityMapVM", "Rated user $userId")
                 } else {
-                    Log.e("MapViewModel", "Failed to rate user: ${response.code()}")
+                    Log.e("AuthorityMapVM", "Failed to rate user: ${response.code()}")
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -861,7 +661,7 @@ class MapViewModel(private val api: UserApi) : ViewModel() {
                         } else it
                     }
                 } else {
-                    Log.e("MapViewModel", "Failed to update status: ${response.code()}")
+                    Log.e("AuthorityMapVM", "Failed to update status: ${response.code()}")
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -870,42 +670,14 @@ class MapViewModel(private val api: UserApi) : ViewModel() {
     }
 
     fun resetAndReload(
+        userRole: String?,
         radiusKm: Int = 10,
         userLatitude: Double? = null,
         userLongitude: Double? = null
     ) {
         currentRadiusKm = radiusKm
-        currentUserLatitude = userLatitude
-        currentUserLongitude = userLongitude
         offset = 0
         issues = emptyList()
-        loadNearbyIssues(radiusKm, userLatitude, userLongitude)
+        loadIssues(userRole, radiusKm)
     }
-}
-
-// --- STATUS BADGE ---
-@Composable
-fun StatusBadge(status: ReportStatus, compact: Boolean = false) {
-    val (color, text) = when (status) {
-        ReportStatus.PENDING -> MaterialTheme.colorScheme.error to "Pending"
-        ReportStatus.IN_PROGRESS -> MaterialTheme.colorScheme.tertiary to "In Progress"
-        ReportStatus.APPROVED -> Color(0xFF4CAF50) to "Approved"
-        ReportStatus.REJECTED -> Color(0xFFF44336) to "Rejected"
-        ReportStatus.RESOLVED -> Color(0xFF2196F3) to "Resolved"
-    }
-
-    Box(
-        modifier = Modifier
-            .background(color.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-            .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-            .padding(horizontal = if (compact) 6.dp else 8.dp, vertical = 4.dp)
-    ) {
-        Text(text, color = color, style = MaterialTheme.typography.bodySmall, fontSize = if (compact) 10.sp else 12.sp)
-    }
-}
-
-// --- MAP TYPE ---
-enum class MapType(val displayName: String, val tileSource: ITileSource) {
-    STANDARD("Map", TileSourceFactory.MAPNIK),
-    SATELLITE("Satellite", TileSourceFactory.WIKIMEDIA)
 }

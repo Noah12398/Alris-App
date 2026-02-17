@@ -22,6 +22,7 @@ import com.example.alris.data.ApiClient
 import com.example.alris.data.UpdateAuthorityProfileRequest
 import com.example.alris.ui.theme.AlrisTheme
 import com.example.alris.user.MapScreen
+import com.example.alris.authority.AuthorityMapScreen
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -43,7 +44,10 @@ class LowerAuthorityDashboardActivity : ComponentActivity() {
                         val startDest = if (initialSetup) "profile" else "map"
 
                         NavHost(navController = navController, startDestination = startDest) {
-                            composable("map") { MapScreen() }
+                            composable("map") { 
+                                val context = LocalContext.current
+                                AuthorityMapScreen() 
+                            }
                             composable("settings") { SettingsScreen() }
                             composable("profile") {
                                 val context = LocalContext.current

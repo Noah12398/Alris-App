@@ -15,7 +15,7 @@ fun UserBottomNavigationBar(navController: NavHostController) {
         BottomNavItem("camera", "Report", Icons.Default.CameraAlt),
         BottomNavItem("my_reports", "My Reports", Icons.Default.ListAlt),
         BottomNavItem("notifications", "Alerts", Icons.Default.Notifications),
-        BottomNavItem("settings", "Settings", Icons.Default.Settings)
+        BottomNavItem("profile", "Profile", Icons.Default.Person)
     )
 
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route

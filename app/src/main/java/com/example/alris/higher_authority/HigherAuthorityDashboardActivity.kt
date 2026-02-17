@@ -15,6 +15,7 @@ import com.example.alris.ui.theme.AlrisTheme
 import com.example.alris.user.UserBottomNavigationBar
 import com.example.alris.user.MapScreen
 import com.example.alris.user.MultiPhotoCameraScreen
+import com.example.alris.authority.AuthorityMapScreen
 
 class HigherAuthorityDashboardActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,7 +30,7 @@ class HigherAuthorityDashboardActivity : ComponentActivity() {
                 ) { padding ->
                     Box(modifier = Modifier.Companion.padding(padding)) {
                         NavHost(navController, startDestination = "map") {
-                            composable("map") { MapScreen() }
+                            composable("map") { AuthorityMapScreen() }
                             composable("department issues") { DepartmentIssuesScreen() }
                             composable("approval") { ApprovalScreen() }
                             composable("flagged_users") { FlaggedUsersScreen() }

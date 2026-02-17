@@ -133,7 +133,8 @@ data class IssueItem(
     val distance_km: Double? = null,
     val created_at: String? = null,
     val updated_at: String? = null,
-    val reports: List<ReportSummary>? = null
+    val reports: List<ReportSummary>? = null,
+    val is_upvoted: Boolean? = null
 )
 
 // ============= UI MODELS (for displaying in app) =============
@@ -149,7 +150,9 @@ data class ReportPoint(
     val longitude: Double,
     val distance_meters: Double,
     val distance_km: Double,
-    val created_at: String
+    val created_at: String,
+    val isUpvoted: Boolean = false,
+    val upvoteCount: Int = 0
 )
 enum class ReportCategory(
     val display: String,
