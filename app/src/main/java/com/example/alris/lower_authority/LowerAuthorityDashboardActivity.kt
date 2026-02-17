@@ -48,6 +48,21 @@ class LowerAuthorityDashboardActivity : ComponentActivity() {
                                 val context = LocalContext.current
                                 AuthorityMapScreen() 
                             }
+                            composable("issues") {
+                                LowerAuthorityIssuesListScreen(
+                                    onIssueClick = { issueId ->
+                                        navController.navigate("issue_details/$issueId")
+                                    }
+                                )
+                            }
+                            composable("issue_details/{issueId}") { backStackEntry ->
+                                val issueId = backStackEntry.arguments?.getString("issueId") ?: ""
+                                IssueDetailsScreen(
+                                    issueId = issueId,
+                                    onBack = { navController.popBackStack() },
+                                    isLowerAuthority = true
+                                )
+                            }
                             composable("settings") { SettingsScreen() }
                             composable("profile") {
                                 val context = LocalContext.current

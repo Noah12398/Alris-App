@@ -31,10 +31,26 @@ class HigherAuthorityDashboardActivity : ComponentActivity() {
                     Box(modifier = Modifier.Companion.padding(padding)) {
                         NavHost(navController, startDestination = "map") {
                             composable("map") { AuthorityMapScreen() }
-                            composable("department issues") { DepartmentIssuesScreen() }
-                            composable("approval") { ApprovalScreen() }
+                            composable("department issues") {
+                                DepartmentIssuesScreen(
+                                    onIssueClick = { issueId ->
+                                        navController.navigate("issue_details/$issueId")
+                                    }
+                                )
+                            }
+                            composable("issue_details/{issueId}") { backStackEntry ->
+                                val issueId = backStackEntry.arguments?.getString("issueId") ?: ""
+                                com.example.alris.lower_authority.IssueDetailsScreen(
+                                    issueId = issueId,
+                                    onBack = { navController.popBackStack() },
+                                    isLowerAuthority = false
+                                )
+                            }
                             composable("flagged_users") { FlaggedUsersScreen() }
-                            composable("settings") { SettingsScreen() }
+                            composable("admin_stats") { AdminStatsScreen(navController) }
+                            composable("audit_logs") { AuditLogsScreen(navController) }
+                            composable("register_authority") { RegisterAuthorityScreen(navController) }
+                            composable("authority_profile") { com.example.alris.authority.AuthorityProfileScreen(navController) }
                         }
                     }
                 }

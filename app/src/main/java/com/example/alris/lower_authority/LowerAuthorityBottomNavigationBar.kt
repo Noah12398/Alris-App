@@ -12,7 +12,8 @@ import com.example.alris.higher_authority.BottomNavItem
 fun LowerAuthorityBottomNavigationBar(navController: NavHostController) {
     val items = listOf(
         BottomNavItem("map", "Map", Icons.Default.Map),
-        BottomNavItem("settings", "Settings", Icons.Default.Settings)
+        BottomNavItem("issues", "Issues", Icons.Default.List),
+        BottomNavItem("profile", "Profile", Icons.Default.Person)
     )
 
     NavigationBar {

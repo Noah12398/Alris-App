@@ -234,6 +234,29 @@ data class Issue(
     val reports: List<ReportSummary> = emptyList()
 )
 
+// Detailed issue model for getIssueById endpoint
+data class IssueDetail(
+    val issue_id: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val status: String,
+    val category: String?,
+    val department: String? = null,
+    val priority: String? = null,
+    val upvote_count: Int? = null,
+    val report_count: Int? = null,
+    val description: String? = null,
+    val created_at: String? = null,
+    val updated_at: String? = null,
+    val resolved_at: String? = null,
+    val reports: List<ReportSummary> = emptyList()
+)
+
+// Wrapper for getIssueById API response: { success: true, data: { issue: {...} } }
+data class IssueDetailResponse(
+    val issue: IssueDetail
+)
+
 data class ReportSummary(
     val report_id: String,
     val user_id: String? = null,
@@ -409,9 +432,12 @@ data class AuthorityProfile(
     val email: String,
     val phone: String?,
     val department: String,
-    val is_initialized: Boolean, // Backend raw SQL returns snake_case
+    val is_initialized: Boolean? = null,
     val created_at: String,
-    val updated_at: String
+    val updated_at: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val role: String? = null
 )
 
 // ============= ADMIN MODELS =============

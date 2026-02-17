@@ -66,6 +66,9 @@ interface UserApi {
     @PUT("issues/status")
     suspend fun updateIssueStatus(@Body body: StatusUpdate): Response<ApiResponse<Any>>
 
+    @GET("issues/{issueId}")
+    suspend fun getIssueById(@Path("issueId") issueId: String): Response<ApiResponse<IssueDetailResponse>>
+
     @POST("authority/register-lower")
     suspend fun registerLowerAuthority(
         @Body body: RegisterLowerAuthorityRequest

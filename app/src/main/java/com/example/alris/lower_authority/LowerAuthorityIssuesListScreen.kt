@@ -1,8 +1,8 @@
-package com.example.alris.higher_authority
+package com.example.alris.lower_authority
 
-import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,7 +14,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -23,39 +22,36 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.example.alris.data.ApiClient
-import com.example.alris.data.Issue
-import com.example.alris.data.StatusUpdate
+import com.example.alris.data.*
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DepartmentIssuesScreen(onIssueClick: (String) -> Unit = {}) {
+fun LowerAuthorityIssuesListScreen(onIssueClick: (String) -> Unit) {
     val context = LocalContext.current
     val api = remember { ApiClient.createUserApi(context) }
-    var issues by remember { mutableStateOf<List<Issue>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var errorMsg by remember { mutableStateOf<String?>(null) }
-    val coroutineScope = rememberCoroutineScope()
-
-    LaunchedEffect(Unit) {
-        try {
-            val response = api.getDepartmentIssues()
-            if (response.isSuccessful) {
-                issues = response.body()?.data?.issues ?: emptyList()
-            } else {
-                errorMsg = "Error: ${response.code()} ${response.message()}"
-            }
-        } catch (e: Exception) {
-            errorMsg = "Exception: ${e.message}"
-        } finally {
-            isLoading = false
+    
+    val viewModel: IssuesListViewModel = viewModel(factory = object : ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            @Suppress("UNCHECKED_CAST")
+            return IssuesListViewModel(api) as T
         }
+    })
+    
+    val issues = viewModel.issues
+    val isLoading = viewModel.isLoading
+    val errorMsg = viewModel.errorMsg
+    
+    LaunchedEffect(Unit) {
+        viewModel.loadNearbyIssues()
     }
-
+    
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -100,7 +96,7 @@ fun DepartmentIssuesScreen(onIssueClick: (String) -> Unit = {}) {
                     ) {
                         Column {
                             Text(
-                                text = "Department Issues",
+                                text = "Nearby Issues",
                                 style = MaterialTheme.typography.headlineSmall,
                                 color = MaterialTheme.colorScheme.onPrimary,
                                 fontWeight = FontWeight.Bold
@@ -112,7 +108,7 @@ fun DepartmentIssuesScreen(onIssueClick: (String) -> Unit = {}) {
                             )
                         }
                         Icon(
-                            Icons.Default.Assignment,
+                            Icons.Default.List,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(40.dp)
@@ -166,7 +162,7 @@ fun DepartmentIssuesScreen(onIssueClick: (String) -> Unit = {}) {
                                 )
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Text(
-                                    text = errorMsg ?: "",
+                                    text = errorMsg,
                                     color = MaterialTheme.colorScheme.onErrorContainer,
                                     style = MaterialTheme.typography.bodyMedium
                                 )
@@ -202,7 +198,7 @@ fun DepartmentIssuesScreen(onIssueClick: (String) -> Unit = {}) {
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(issues) { issue ->
-                            IssueCard(
+                            IssueListCard(
                                 issue = issue,
                                 onDetailsClick = { onIssueClick(issue.issue_id) }
                             )
@@ -216,13 +212,13 @@ fun DepartmentIssuesScreen(onIssueClick: (String) -> Unit = {}) {
 }
 
 @Composable
-private fun IssueCard(
-    issue: Issue,
+private fun IssueListCard(
+    issue: IssueItem,
     onDetailsClick: () -> Unit
 ) {
     val context = LocalContext.current
 
-    val statusColor = when (issue.status.lowercase()) {
+    val statusColor = when (issue.status?.lowercase()) {
         "submitted" -> Color(0xFFFF9800)
         "in_progress" -> Color(0xFF2196F3)
         "resolved" -> Color(0xFF4CAF50)
@@ -230,12 +226,12 @@ private fun IssueCard(
         else -> Color(0xFF9E9E9E)
     }
 
-    val statusLabel = when (issue.status.lowercase()) {
-        "submitted" -> "Submitted"
+    val statusLabel = when (issue.status?.lowercase()) {
+        "submitted" -> "Pending"
         "in_progress" -> "In Progress"
         "resolved" -> "Resolved"
         "rejected" -> "Rejected"
-        else -> issue.status
+        else -> issue.status ?: "Unknown"
     }
 
     Card(
@@ -248,7 +244,7 @@ private fun IssueCard(
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Category + Status
+            // Header Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -302,44 +298,42 @@ private fun IssueCard(
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    
+                    issue.distance_km?.let { distance ->
+                        Text(
+                            text = " • ${String.format("%.2f", distance)} km away",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
-            // Reports section (showing count)
-            if (issue.reports.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+            // Report preview
+            if (issue.reports?.isNotEmpty() == true) {
                 Spacer(modifier = Modifier.height(8.dp))
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.Description,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        "${issue.reports.size} reports attached",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                val firstReport = issue.reports.first()
+                Text(
+                    text = firstReport.description ?: "No description",
+                    fontSize = 14.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
-            // Details Button
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
+            // Details Button
             Button(
                 onClick = onDetailsClick,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary
-                )
+                ),
+                shape = RoundedCornerShape(10.dp)
             ) {
                 Icon(
                     Icons.Default.Info,
@@ -347,7 +341,42 @@ private fun IssueCard(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("View Details & Update Status", fontWeight = FontWeight.Medium)
+                Text("View Details", fontWeight = FontWeight.Medium)
+            }
+        }
+    }
+}
+
+class IssuesListViewModel(private val api: UserApi) : ViewModel() {
+    var issues by mutableStateOf<List<IssueItem>>(emptyList())
+        private set
+    var isLoading by mutableStateOf(true)
+        private set
+    var errorMsg by mutableStateOf<String?>(null)
+        private set
+
+    fun loadNearbyIssues() {
+        viewModelScope.launch {
+            try {
+                isLoading = true
+                errorMsg = null
+                
+                val response = api.getNearbyIssues(
+                    radius = 20,
+                    limit = 50,
+                    offset = 0
+                )
+                
+                if (response.isSuccessful) {
+                    val data = response.body()?.data
+                    issues = data?.issues ?: emptyList()
+                } else {
+                    errorMsg = "Error: ${response.code()} ${response.message()}"
+                }
+            } catch (e: Exception) {
+                errorMsg = "Exception: ${e.message}"
+            } finally {
+                isLoading = false
             }
         }
     }
