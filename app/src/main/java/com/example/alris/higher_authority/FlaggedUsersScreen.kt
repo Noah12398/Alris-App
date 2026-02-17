@@ -229,9 +229,9 @@ private fun FlaggedUserCard(
     onClick: () -> Unit
 ) {
     val trustColor = when {
-        user.trustScore < 2.0 -> Color(0xFFF44336)
-        user.trustScore < 3.0 -> Color(0xFFFF9800)
-        else -> Color(0xFF4CAF50)
+        user.trustScore < 2.0 -> MaterialTheme.colorScheme.error
+        user.trustScore < 3.0 -> com.example.alris.ui.theme.StatusPending
+        else -> com.example.alris.ui.theme.StatusResolved
     }
 
     Card(
@@ -464,7 +464,7 @@ private fun RatingItem(rating: UserRating) {
                         Icon(
                             if (index < rating.rating) Icons.Default.Star else Icons.Default.StarBorder,
                             contentDescription = null,
-                            tint = if (index < rating.rating) Color(0xFFFFC107) else Color.Gray.copy(alpha = 0.3f),
+                            tint = if (index < rating.rating) com.example.alris.ui.theme.StatusPending else Color.Gray.copy(alpha = 0.3f),
                             modifier = Modifier.size(16.dp)
                         )
                     }

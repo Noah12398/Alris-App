@@ -34,6 +34,10 @@ import androidx.lifecycle.*
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.alris.Constants.logoutAndGoToLogin
 import com.example.alris.data.*
+import com.example.alris.ui.theme.StatusPending
+import com.example.alris.ui.theme.StatusInProgress
+import com.example.alris.ui.theme.StatusResolved
+import com.example.alris.ui.theme.StatusRejected
 import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.ITileSource
@@ -366,9 +370,9 @@ fun MapStatsCard(
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            StatItem(pendingCount, "Pending", MaterialTheme.colorScheme.error)
-            StatItem(inProgressCount, "In Progress", MaterialTheme.colorScheme.tertiary)
-            StatItem(resolvedCount, "Resolved", Color.Green)
+            StatItem(pendingCount, "Pending", com.example.alris.ui.theme.StatusPending)
+            StatItem(inProgressCount, "In Progress", com.example.alris.ui.theme.StatusInProgress)
+            StatItem(resolvedCount, "Resolved", com.example.alris.ui.theme.StatusResolved)
         }
     }
 }
@@ -565,7 +569,7 @@ fun RateUserDialog(
                         Icon(
                             if (star <= rating) Icons.Default.Star else Icons.Default.StarBorder,
                             contentDescription = "Star $star",
-                            tint = Color(0xFFFFC107),
+                            tint = com.example.alris.ui.theme.StatusPending,
                             modifier = Modifier
                                 .size(40.dp)
                                 .clickable { rating = star }

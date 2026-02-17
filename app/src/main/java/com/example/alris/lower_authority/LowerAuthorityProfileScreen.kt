@@ -34,6 +34,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.alris.data.*
 import com.google.android.gms.location.LocationServices
+import com.example.alris.ui.components.ThemeSelector
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -183,6 +184,12 @@ private fun ProfileViewMode(profile: AuthorityProfile, onEditClick: () -> Unit) 
             Spacer(modifier = Modifier.width(8.dp))
             Text("Edit Profile", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         }
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        ThemeSelector()
+        
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 

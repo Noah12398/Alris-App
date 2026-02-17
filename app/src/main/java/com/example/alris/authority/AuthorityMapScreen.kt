@@ -248,9 +248,9 @@ fun AuthorityMapStatsCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             // Reusing StatItem from somewhere? Or just define locally if small
-            AuthorityStatItem(pendingCount, "Pending", MaterialTheme.colorScheme.error)
-            AuthorityStatItem(inProgressCount, "In Progress", MaterialTheme.colorScheme.tertiary)
-            AuthorityStatItem(resolvedCount, "Resolved", Color(0xFF4CAF50))
+            AuthorityStatItem(pendingCount, "Pending", com.example.alris.ui.theme.StatusPending)
+            AuthorityStatItem(inProgressCount, "In Progress", com.example.alris.ui.theme.StatusInProgress)
+            AuthorityStatItem(resolvedCount, "Resolved", com.example.alris.ui.theme.StatusResolved)
         }
     }
 }
@@ -421,7 +421,7 @@ fun RateUserDialog(
                         Icon(
                             if (star <= rating) Icons.Default.Star else Icons.Default.StarBorder,
                             contentDescription = "Star $star",
-                            tint = Color(0xFFFFC107),
+                            tint = com.example.alris.ui.theme.StatusPending,
                             modifier = Modifier
                                 .size(40.dp)
                                 .clickable { rating = star }

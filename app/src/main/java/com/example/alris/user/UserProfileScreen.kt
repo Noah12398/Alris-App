@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.alris.ui.components.ThemeSelector
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -216,6 +217,16 @@ fun UserProfileScreen(onBack: () -> Unit) {
                                     }
                                 }
                             }
+                        }
+                        
+                        // Appearance Section
+                        item {
+                            ThemeSelector()
+                        }
+                        
+                        // Bottom Spacer
+                        item {
+                            Spacer(modifier = Modifier.height(32.dp))
                         }
                     }
                 }

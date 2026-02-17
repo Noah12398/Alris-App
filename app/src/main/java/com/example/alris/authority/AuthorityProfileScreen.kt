@@ -20,6 +20,7 @@ import androidx.navigation.NavController
 import com.example.alris.data.ApiClient
 import com.example.alris.data.AuthorityProfile
 import com.example.alris.data.UpdateAuthorityProfileRequest
+import com.example.alris.ui.components.ThemeSelector
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -230,6 +231,10 @@ fun AuthorityProfileScreen(navController: NavController) {
                             ProfileDetailItem(Icons.Default.CalendarToday, "Joined", data.createdAt?.substringBefore("T") ?: "Unknown")
                             
                             Spacer(modifier = Modifier.weight(1f))
+                            
+                            ThemeSelector()
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
                             
                             OutlinedButton(
                                 onClick = {

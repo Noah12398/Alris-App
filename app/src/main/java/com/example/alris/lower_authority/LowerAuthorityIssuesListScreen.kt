@@ -219,11 +219,11 @@ private fun IssueListCard(
     val context = LocalContext.current
 
     val statusColor = when (issue.status?.lowercase()) {
-        "submitted" -> Color(0xFFFF9800)
-        "in_progress" -> Color(0xFF2196F3)
-        "resolved" -> Color(0xFF4CAF50)
-        "rejected" -> Color(0xFFF44336)
-        else -> Color(0xFF9E9E9E)
+        "submitted" -> com.example.alris.ui.theme.StatusPending
+        "in_progress" -> com.example.alris.ui.theme.StatusInProgress
+        "resolved" -> com.example.alris.ui.theme.StatusResolved
+        "rejected" -> com.example.alris.ui.theme.StatusRejected
+        else -> com.example.alris.ui.theme.StatusPending
     }
 
     val statusLabel = when (issue.status?.lowercase()) {

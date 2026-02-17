@@ -24,6 +24,10 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.alris.data.AdminStatsResponse
 import com.example.alris.data.ApiClient
+import com.example.alris.ui.theme.StatusPending
+import com.example.alris.ui.theme.StatusInProgress
+import com.example.alris.ui.theme.StatusResolved
+import com.example.alris.ui.theme.StatusRejected
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -108,14 +112,14 @@ fun AdminStatsScreen(navController: NavController) {
                             title = "Users",
                             value = data.totalUsers.toString(),
                             icon = Icons.Default.Group,
-                            color = Color(0xFF2196F3),
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.weight(1f)
                         )
                         StatCard(
                             title = "Reports",
                             value = data.totalReports.toString(),
                             icon = Icons.Default.Description,
-                            color = Color(0xFF4CAF50),
+                            color = com.example.alris.ui.theme.StatusResolved,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -127,14 +131,14 @@ fun AdminStatsScreen(navController: NavController) {
                             title = "Issues",
                             value = data.totalIssues.toString(),
                             icon = Icons.Default.Warning,
-                            color = Color(0xFFFF9800),
+                            color = com.example.alris.ui.theme.StatusPending,
                             modifier = Modifier.weight(1f)
                         )
                         StatCard(
                             title = "Flagged",
                             value = data.flaggedUsers.toString(),
                             icon = Icons.Default.Flag,
-                            color = Color(0xFFF44336),
+                            color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -202,10 +206,10 @@ fun AdminStatsScreen(navController: NavController) {
                                                 .height(8.dp)
                                                 .clip(RoundedCornerShape(4.dp)),
                                             color = when (status) {
-                                                "resolved" -> Color(0xFF4CAF50)
-                                                "in_progress" -> Color(0xFF2196F3)
-                                                "rejected" -> Color(0xFFF44336)
-                                                else -> Color(0xFFFFC107)
+                                                "resolved" -> com.example.alris.ui.theme.StatusResolved
+                                                "in_progress" -> com.example.alris.ui.theme.StatusInProgress
+                                                "rejected" -> com.example.alris.ui.theme.StatusRejected
+                                                else -> com.example.alris.ui.theme.StatusPending
                                             }
                                         )
                                         Spacer(modifier = Modifier.height(8.dp))

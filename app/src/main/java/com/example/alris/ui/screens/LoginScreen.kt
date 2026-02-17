@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -51,8 +52,8 @@ fun LoginScreen(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                        MaterialTheme.colorScheme.surface
+                        MaterialTheme.colorScheme.primaryContainer,
+                        MaterialTheme.colorScheme.background
                     )
                 )
             )
@@ -65,165 +66,195 @@ fun LoginScreen(
             verticalArrangement = Arrangement.Center
         ) {
 
-            Text(
-                text = "ALRIS",
-                style = MaterialTheme.typography.displayMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-
-            Text(
-                text = "Welcome Back",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 32.dp)
-            )
-
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            // Logo / Branding
+            Surface(
+                modifier = Modifier.size(80.dp).padding(bottom = 16.dp),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.primary,
+                shadowElevation = 8.dp
             ) {
-                Column(Modifier.padding(16.dp)) {
+                Box(contentAlignment = Alignment.Center) {
                     Text(
-                        text = "Select Role",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(bottom = 12.dp)
+                        text = "A",
+                        fontSize = 40.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary
                     )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf(
-                            "user" to "User",
-                            "authority" to "Authority",
-                            "higher_authority" to "Higher Auth"
-                        ).forEach { (value, label) ->
-                            FilterChip(
-                                selected = role == value,
-                                onClick = { role = value },
-                                label = { Text(text = label, fontSize = 13.sp) },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
                 }
             }
 
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                label = { Text("Email") },
-                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+            Text(
+                text = "ALRIS",
+                style = MaterialTheme.typography.displayMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            
+            Text(
+                text = "Civic Intelligence Platform",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp, bottom = 48.dp)
             )
 
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Password") },
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                trailingIcon = {
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(
-                            imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                            contentDescription = null
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                shape = RoundedCornerShape(24.dp)
+            ) {
+                Column(Modifier.padding(24.dp)) {
+                    Text(
+                        text = "Sign In",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 24.dp)
+                    )
+
+                    // Role Selection
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
+                    ) {
+                        val roles = listOf(
+                            "user" to "User",
+                            "authority" to "Auth",
+                            "higher_authority" to "Admin"
                         )
-                    }
-                },
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
-            )
-
-            Button(
-                enabled = !isLoading && email.isNotBlank() && password.isNotBlank(),
-                onClick = {
-                    isLoading = true
-                    val request = LoginRequest(email, password)
-
-                    CoroutineScope(Dispatchers.IO).launch {
-                        try {
-                            val response = when (role) {
-                                "user" -> api.loginUser(request)
-                                "authority", "higher_authority" -> api.loginAuthority(request)
-                                else -> api.loginUser(request)
+                        roles.forEachIndexed { index, (value, label) ->
+                            SegmentedButton(
+                                selected = role == value,
+                                onClick = { role = value },
+                                shape = SegmentedButtonDefaults.itemShape(index = index, count = roles.size)
+                            ) {
+                                Text(label)
                             }
-
-                            if (!response.isSuccessful) {
-                                withContext(Dispatchers.Main) {
-                                    Toast.makeText(context, "Login failed", Toast.LENGTH_LONG).show()
-                                }
-                                return@launch
-                            }
-
-                            val apiResponse = response.body()!!
-                            val loginData = apiResponse.data!!
-                            tokenManager.saveAccessToken(loginData.accessToken)
-                            tokenManager.saveRefreshToken(loginData.refreshToken)
-
-                            // ✅ Proper backend user extraction
-                            val backendUser = loginData.user
-                            val backendRole = backendUser?.role   // "authority" | "higher" | "citizen"
-                            val isInitialized = backendUser?.isInitialized ?: true
-
-                            val mappedRole = when (backendRole) {
-                                "higher" -> "higher_authority"
-                                "authority" -> "authority"
-                                else -> "user"
-                            }
-                            tokenManager.saveUserRole(mappedRole)
-
-                            withContext(Dispatchers.Main) {
-                                Toast.makeText(context, "Login Successful!", Toast.LENGTH_LONG).show()
-                                onLoginResult(loginData.accessToken)
-
-                                when (mappedRole) {
-                                    "authority" -> {
-                                        if (!isInitialized) {
-                                            val intent = Intent(context, LowerAuthorityDashboardActivity::class.java)
-                                            intent.putExtra("initialSetup", true)
-                                            context.startActivity(intent)
-                                        } else {
-                                            context.startActivity(Intent(context, LowerAuthorityDashboardActivity::class.java))
-                                        }
-                                    }
-                                    "higher_authority" -> {
-                                        context.startActivity(Intent(context, HigherAuthorityDashboardActivity::class.java))
-                                    }
-                                    else -> {
-                                        context.startActivity(Intent(context, UserDashboardActivity::class.java))
-                                    }
-                                }
-                            }
-
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                            }
-                        } finally {
-                            withContext(Dispatchers.Main) { isLoading = false }
                         }
                     }
-                },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                if (isLoading)
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                else
-                    Text("Login", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            }
 
-            if (role == "user") {
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = onNavigateToRegister,
-                    modifier = Modifier.fillMaxWidth().height(56.dp)
-                ) {
-                    Text("Create Account", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        label = { Text("Email Address") },
+                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text("Password") },
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = null
+                                )
+                            }
+                        },
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)
+                    )
+
+                    Button(
+                        enabled = !isLoading && email.isNotBlank() && password.isNotBlank(),
+                        onClick = {
+                            isLoading = true
+                            val request = LoginRequest(email, password)
+
+                            CoroutineScope(Dispatchers.IO).launch {
+                                try {
+                                    val response = when (role) {
+                                        "user" -> api.loginUser(request)
+                                        "authority", "higher_authority" -> api.loginAuthority(request)
+                                        else -> api.loginUser(request)
+                                    }
+
+                                    if (!response.isSuccessful) {
+                                        withContext(Dispatchers.Main) {
+                                            Toast.makeText(context, "Login failed: ${response.message()}", Toast.LENGTH_LONG).show()
+                                        }
+                                        return@launch
+                                    }
+
+                                    val apiResponse = response.body()!!
+                                    val loginData = apiResponse.data!!
+                                    tokenManager.saveAccessToken(loginData.accessToken)
+                                    tokenManager.saveRefreshToken(loginData.refreshToken)
+
+                                    val backendUser = loginData.user
+                                    val backendRole = backendUser?.role
+                                    val isInitialized = backendUser?.isInitialized ?: true
+
+                                    val mappedRole = when (backendRole) {
+                                        "higher" -> "higher_authority"
+                                        "authority" -> "authority"
+                                        else -> "user"
+                                    }
+                                    tokenManager.saveUserRole(mappedRole)
+
+                                    withContext(Dispatchers.Main) {
+                                        Toast.makeText(context, "Welcome back!", Toast.LENGTH_SHORT).show()
+                                        onLoginResult(loginData.accessToken)
+
+                                        when (mappedRole) {
+                                            "authority" -> {
+                                                if (!isInitialized) {
+                                                    val intent = Intent(context, LowerAuthorityDashboardActivity::class.java)
+                                                    intent.putExtra("initialSetup", true)
+                                                    context.startActivity(intent)
+                                                } else {
+                                                    context.startActivity(Intent(context, LowerAuthorityDashboardActivity::class.java))
+                                                }
+                                            }
+                                            "higher_authority" -> {
+                                                context.startActivity(Intent(context, HigherAuthorityDashboardActivity::class.java))
+                                            }
+                                            else -> {
+                                                context.startActivity(Intent(context, UserDashboardActivity::class.java))
+                                            }
+                                        }
+                                    }
+
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) {
+                                        Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                                    }
+                                } finally {
+                                    withContext(Dispatchers.Main) { isLoading = false }
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        if (isLoading)
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
+                        else
+                            Text("Sign In", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    if (role == "user") {
+                        Spacer(Modifier.height(16.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Don't have an account?", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            TextButton(onClick = onNavigateToRegister) {
+                                Text("Sign Up", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
                 }
             }
         }

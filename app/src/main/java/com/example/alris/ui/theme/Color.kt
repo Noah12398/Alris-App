@@ -2,75 +2,80 @@ package com.example.alris.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// ============= ALRIS CIVIC TECH COLOR PALETTE =============
+// ============= ALRIS PREMIUM PALETTE =============
 
-// Primary — Deep Teal (trust, authority, professionalism)
-val PrimaryLight = Color(0xFF0D7377)
+// Primary — Deep Professional Teal
+val PrimaryLight = Color(0xFF006A6A)
 val OnPrimaryLight = Color(0xFFFFFFFF)
-val PrimaryContainerLight = Color(0xFFB2DFDB)
-val OnPrimaryContainerLight = Color(0xFF003735)
+val PrimaryContainerLight = Color(0xFF9CF1F0)
+val OnPrimaryContainerLight = Color(0xFF002020)
 
-// Secondary — Warm Amber (energy, action, civic engagement)
-val SecondaryLight = Color(0xFFFF8C42)
+// Secondary — Warm Amber/Orange (Call to Action)
+val SecondaryLight = Color(0xFF9A4522)
 val OnSecondaryLight = Color(0xFFFFFFFF)
-val SecondaryContainerLight = Color(0xFFFFE0CC)
-val OnSecondaryContainerLight = Color(0xFF3D1E00)
+val SecondaryContainerLight = Color(0xFFFFDBCE)
+val OnSecondaryContainerLight = Color(0xFF380D00)
 
-// Tertiary — Deep Blue (professionalism, trust)
-val TertiaryLight = Color(0xFF1A365D)
+// Tertiary — Trust Blue
+val TertiaryLight = Color(0xFF4A607C)
 val OnTertiaryLight = Color(0xFFFFFFFF)
-val TertiaryContainerLight = Color(0xFFD1E3FF)
-val OnTertiaryContainerLight = Color(0xFF001E3D)
+val TertiaryContainerLight = Color(0xFFD2E4FF)
+val OnTertiaryContainerLight = Color(0xFF031C35)
 
-// Error
-val ErrorLight = Color(0xFFDC2626)
+// Functional Colors
+val ErrorLight = Color(0xFFBA1A1A)
 val OnErrorLight = Color(0xFFFFFFFF)
-val ErrorContainerLight = Color(0xFFFEE2E2)
-val OnErrorContainerLight = Color(0xFF7F1D1D)
+val ErrorContainerLight = Color(0xFFFFDAD6)
+val OnErrorContainerLight = Color(0xFF410002)
 
-// Background / Surface
-val BackgroundLight = Color(0xFFF8FAFB)
-val OnBackgroundLight = Color(0xFF1A1C1E)
-val SurfaceLight = Color(0xFFFFFFFF)
-val OnSurfaceLight = Color(0xFF1A1C1E)
-val SurfaceVariantLight = Color(0xFFF0F5F3)
-val OnSurfaceVariantLight = Color(0xFF49504D)
-val OutlineLight = Color(0xFF79847F)
-val OutlineVariantLight = Color(0xFFC9D3CE)
+// Neutrals & Backgrounds (Light)
+val BackgroundLight = Color(0xFFF4FBF9) // Very subtle mint tint
+val OnBackgroundLight = Color(0xFF161D1D)
+val SurfaceLight = Color(0xFFF4FBF9) 
+val OnSurfaceLight = Color(0xFF161D1D)
+val SurfaceVariantLight = Color(0xFFDAE5E4)
+val OnSurfaceVariantLight = Color(0xFF3F4948)
+val OutlineLight = Color(0xFF6F7979)
+val OutlineVariantLight = Color(0xFFBFC9C8)
 
-// ============= DARK THEME COLORS =============
+// ============= DARK THEME (Premium Dark Mode) =============
 
-val PrimaryDark = Color(0xFF4FDBD0)
-val OnPrimaryDark = Color(0xFF003735)
-val PrimaryContainerDark = Color(0xFF005B5A)
-val OnPrimaryContainerDark = Color(0xFFB2DFDB)
+// Primary — Luminous Teal
+val PrimaryDark = Color(0xFF80D5D4)
+val OnPrimaryDark = Color(0xFF003737)
+val PrimaryContainerDark = Color(0xFF004F4F)
+val OnPrimaryContainerDark = Color(0xFF9CF1F0)
 
-val SecondaryDark = Color(0xFFFFB380)
-val OnSecondaryDark = Color(0xFF5C2E00)
-val SecondaryContainerDark = Color(0xFF7A4100)
-val OnSecondaryContainerDark = Color(0xFFFFE0CC)
+// Secondary — Soft Warm Orange
+val SecondaryDark = Color(0xFFFFB598)
+val OnSecondaryDark = Color(0xFF5D1900)
+val SecondaryContainerDark = Color(0xFF7C2E11)
+val OnSecondaryContainerDark = Color(0xFFFFDBCE)
 
-val TertiaryDark = Color(0xFF9EC5FF)
-val OnTertiaryDark = Color(0xFF003362)
-val TertiaryContainerDark = Color(0xFF0A4A8A)
-val OnTertiaryContainerDark = Color(0xFFD1E3FF)
+// Tertiary — Soft Blue
+val TertiaryDark = Color(0xFFB1C8E8)
+val OnTertiaryDark = Color(0xFF1B314C)
+val TertiaryContainerDark = Color(0xFF334863)
+val OnTertiaryContainerDark = Color(0xFFD2E4FF)
 
-val ErrorDark = Color(0xFFF87171)
-val OnErrorDark = Color(0xFF7F1D1D)
-val ErrorContainerDark = Color(0xFF991B1B)
-val OnErrorContainerDark = Color(0xFFFEE2E2)
+// Functional Colors
+val ErrorDark = Color(0xFFFFB4AB)
+val OnErrorDark = Color(0xFF690005)
+val ErrorContainerDark = Color(0xFF93000A)
+val OnErrorContainerDark = Color(0xFFFFDAD6)
 
-val BackgroundDark = Color(0xFF0F1419)
-val OnBackgroundDark = Color(0xFFE1E3E5)
-val SurfaceDark = Color(0xFF1A2128)
-val OnSurfaceDark = Color(0xFFE1E3E5)
-val SurfaceVariantDark = Color(0xFF242E35)
-val OnSurfaceVariantDark = Color(0xFFC0CAD0)
-val OutlineDark = Color(0xFF8A9298)
-val OutlineVariantDark = Color(0xFF3A454E)
+// Neutrals & Backgrounds (Dark - Amoled-ish but richer)
+val BackgroundDark = Color(0xFF0E1515) // Deep Green-Black
+val OnBackgroundDark = Color(0xFFDEE4E3)
+val SurfaceDark = Color(0xFF0E1515)
+val OnSurfaceDark = Color(0xFFDEE4E3)
+val SurfaceVariantDark = Color(0xFF3F4948)
+val OnSurfaceVariantDark = Color(0xFFBFC9C8)
+val OutlineDark = Color(0xFF899392)
+val OutlineVariantDark = Color(0xFF444748)
 
-// ============= FUNCTIONAL COLORS =============
-val StatusPending = Color(0xFFFF9800)
-val StatusInProgress = Color(0xFF2196F3)
-val StatusResolved = Color(0xFF4CAF50)
-val StatusRejected = Color(0xFFF44336)
+// Status Colors
+val StatusPending = Color(0xFFFFB74D) // Orange
+val StatusInProgress = Color(0xFF4FC3F7) // Light Blue
+val StatusResolved = Color(0xFF81C784) // Light Green
+val StatusRejected = Color(0xFFE57373) // Red
