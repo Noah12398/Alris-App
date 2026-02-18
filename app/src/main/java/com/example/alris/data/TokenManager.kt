@@ -26,6 +26,9 @@ class TokenManager(private val context: Context) {
     val userRoleFlow: Flow<String?> = context.dataStore.data.map { prefs ->
         prefs[USER_ROLE]
     }
+    val refreshTokenFlow: Flow<String?> = context.dataStore.data.map { prefs ->
+        prefs[REFRESH_TOKEN]
+    }
     suspend fun saveAccessToken(token: String) {
         context.dataStore.edit { prefs ->
             prefs[ACCESS_TOKEN] = token

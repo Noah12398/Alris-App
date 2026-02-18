@@ -59,10 +59,29 @@ object ApiClient {
             }
         }
 
+        // --- AUTH CLIENT (For Refresh Token & Login - No Authenticator) ---
+        val authOkHttpClient = OkHttpClient.Builder()
+             .eventListener(eventLogger)
+             .addInterceptor(loggingInterceptor)
+             .build()
+
+        val authRetrofit = Retrofit.Builder()
+             .baseUrl(BASE_URL)
+             .client(authOkHttpClient)
+             .addConverterFactory(GsonConverterFactory.create())
+             .build()
+
+        val authApiService = authRetrofit.create(AuthApiService::class.java)
+
+        // --- MAIN CLIENT (With Token Refresh Interceptor) ---
+        val tokenRefreshInterceptor = TokenRefreshInterceptor(tokenManager, authApiService)
+
+
         val okHttpClient = OkHttpClient.Builder()
-            .eventListener(eventLogger) // 🔥 THIS ADDS DEEP DEBUG
+            .eventListener(eventLogger)
             .addInterceptor(loggingInterceptor)
             .addInterceptor(AuthInterceptor(tokenManager))
+            .addInterceptor(tokenRefreshInterceptor)
             .addNetworkInterceptor { chain ->
                 val request: Request = chain.request()
                 Log.d("AFTER_INTERCEPTOR", "FINAL Request URL: ${request.url}")

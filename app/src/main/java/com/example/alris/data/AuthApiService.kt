@@ -21,14 +21,29 @@ interface AuthApiService {
     suspend fun verifyToken(
         @Body request: VerifyRequest
     ): Response<VerifyResponse>
-}
 
-interface UserApi {
     @POST("auth/register")
     suspend fun registerUser(@Body request: RegisterRequest): Response<ApiResponse<RegisterResponse>>
 
     @POST("auth/login")
     suspend fun loginUser(@Body request: LoginRequest): Response<ApiResponse<LoginResponse>>
+
+    @POST("authority/login")
+    suspend fun loginAuthority(@Body request: LoginRequest): Response<ApiResponse<LoginResponse>>
+
+    @POST("auth/refresh")
+    suspend fun refreshToken(
+        @Body body: Map<String, String>
+    ): Response<ApiResponse<Map<String, String>>>
+
+    @POST("auth/logout")
+    suspend fun logout(
+        @Body body: Map<String, String>
+    ): Response<ApiResponse<Any>>
+}
+
+interface UserApi : AuthApiService {
+
 
     @GET("auth/profile")
     suspend fun getUserProfile(): Response<ApiResponse<UserProfile>>
@@ -53,8 +68,7 @@ interface UserApi {
         @Query("offset") offset: Int = 0
     ): Response<ApiResponse<NearbyIssuesResponse>>
 
-    @POST("authority/login")
-    suspend fun loginAuthority(@Body request: LoginRequest): Response<ApiResponse<LoginResponse>>
+
 
     @GET("issues/department")
     suspend fun getDepartmentIssues(
@@ -82,15 +96,7 @@ interface UserApi {
         @Body request: UpdateAuthorityProfileRequest
     ): Response<ApiResponse<UpdateAuthorityProfileResponse>>
 
-    @POST("auth/refresh")
-    suspend fun refreshToken(
-        @Body body: Map<String, String>
-    ): Response<ApiResponse<Map<String, String>>>
 
-    @POST("auth/logout")
-    suspend fun logout(
-        @Body body: Map<String, String>
-    ): Response<ApiResponse<Any>>
 
     @GET("reports/my-reports")
     suspend fun getMyReports(
