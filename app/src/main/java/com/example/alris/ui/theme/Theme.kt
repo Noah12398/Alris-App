@@ -8,6 +8,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.example.alris.data.AppTheme
 import com.example.alris.data.ThemeManager
+import android.app.Activity
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
 private val LightColorScheme = lightColorScheme(
     primary = PrimaryLight,
@@ -66,26 +71,39 @@ private val DarkColorScheme = darkColorScheme(
 @Composable
 fun AlrisTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // We can add a force parameter if needed, but for now we'll internally observe unless overridden? 
-    // Actually, to avoid breaking changes, let's just use the internal logic if the default is used? 
-    // But we can't easily detect if the default was used. 
-    // Let's change the implementation to observe the manager.
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
-    // We use a remember to keep the manager alive across recompositions
-    val themeManager = remember { com.example.alris.data.ThemeManager(context) }
-    // Observe the theme preference
-    val themePreference by themeManager.themeFlow.collectAsState(initial = com.example.alris.data.AppTheme.SYSTEM)
+    val themeManager = remember { ThemeManager(context) }
+    val themePreference by themeManager.themeFlow.collectAsState(initial = AppTheme.SYSTEM)
 
-    // Determine effective theme
     val useDarkTheme = when (themePreference) {
-        com.example.alris.data.AppTheme.LIGHT -> false
-        com.example.alris.data.AppTheme.DARK -> true
-        com.example.alris.data.AppTheme.SYSTEM -> isSystemInDarkTheme()
+        AppTheme.LIGHT -> false
+        AppTheme.DARK -> true
+        AppTheme.SYSTEM -> isSystemInDarkTheme()
     }
 
     val colorScheme = if (useDarkTheme) DarkColorScheme else LightColorScheme
+
+    // 🔥 SYSTEM BAR CONTROL
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+
+            // Choose ONE of these 👇
+
+            // Option 1: Transparent (Modern Map Style)
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
+
+            // Option 2: Match surface
+            // window.statusBarColor = colorScheme.surface.toArgb()
+
+            // Dark icons for light background
+            WindowCompat.getInsetsController(window, view)
+                .isAppearanceLightStatusBars = !useDarkTheme
+        }
+    }
 
     MaterialTheme(
         colorScheme = colorScheme,
