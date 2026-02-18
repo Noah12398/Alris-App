@@ -32,7 +32,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.alris.Constants.logoutAndGoToLogin
 import com.example.alris.data.*
 import com.example.alris.user.MapTopControls
-import com.example.alris.user.MapType
+
 import com.example.alris.user.StatusBadge
 import com.example.alris.user.rememberMapViewWithLifecycle
 import kotlinx.coroutines.launch
@@ -62,7 +62,7 @@ fun AuthorityMapScreen() {
     val issues = viewModel.issues
     var selectedReport by remember { mutableStateOf<ReportPoint?>(null) }
     var isReportListVisible by remember { mutableStateOf(false) }
-    var currentMapType by remember { mutableStateOf(MapType.STANDARD) }
+
     var showMyLocation by remember { mutableStateOf(true) }
     var showRateDialog by remember { mutableStateOf(false) }
 
@@ -86,9 +86,7 @@ fun AuthorityMapScreen() {
             factory = { mapView },
             modifier = Modifier.fillMaxSize()
         ) { mv ->
-            if (mv.tileProvider.tileSource != currentMapType.tileSource) {
-                mv.setTileSource(currentMapType.tileSource)
-            }
+
 
             mv.overlays.removeAll { it is Marker }
 
@@ -112,10 +110,7 @@ fun AuthorityMapScreen() {
             mv.invalidate()
         }
 
-        // Top Controls
         MapTopControls(
-            currentMapType = currentMapType,
-            onMapTypeChange = { currentMapType = it },
             showMyLocation = showMyLocation,
             onLocationToggle = { showMyLocation = it },
             onReportListToggle = { isReportListVisible = !isReportListVisible },

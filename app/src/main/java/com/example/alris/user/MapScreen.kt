@@ -71,7 +71,7 @@ fun MapScreen() {
     val issues = viewModel.issues
     var selectedReport by remember { mutableStateOf<ReportPoint?>(null) }
     var isReportListVisible by remember { mutableStateOf(false) }
-    var currentMapType by remember { mutableStateOf(MapType.STANDARD) }
+
     var showMyLocation by remember { mutableStateOf(true) }
     var showRateDialog by remember { mutableStateOf(false) }
 
@@ -93,9 +93,7 @@ fun MapScreen() {
             modifier = Modifier.fillMaxSize()
         ) { mv ->
             // Update tile source if map type changed
-            if (mv.tileProvider.tileSource != currentMapType.tileSource) {
-                mv.setTileSource(currentMapType.tileSource)
-            }
+
 
             // Clear previous markers (keep location overlay)
             mv.overlays.removeAll { it is Marker }
@@ -132,8 +130,6 @@ fun MapScreen() {
 
         // Top Controls
         MapTopControls(
-            currentMapType = currentMapType,
-            onMapTypeChange = { currentMapType = it },
             showMyLocation = showMyLocation,
             onLocationToggle = { showMyLocation = it },
             onReportListToggle = { isReportListVisible = !isReportListVisible },
@@ -234,18 +230,6 @@ fun MapScreen() {
                     .padding(16.dp)
             )
         }
-
-        // FAB for adding new report
-        FloatingActionButton(
-            onClick = { /* Add new report */ },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp),
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "Add Report", modifier = Modifier.size(24.dp))
-        }
     }
 
     // Auto-pagination
@@ -262,8 +246,6 @@ private fun getMarkerIcon(context: Context, category: ReportCategory, status: Re
 // --- TOP CONTROLS ---
 @Composable
 fun MapTopControls(
-    currentMapType: MapType,
-    onMapTypeChange: (MapType) -> Unit,
     showMyLocation: Boolean,
     onLocationToggle: (Boolean) -> Unit,
     onReportListToggle: () -> Unit,
@@ -289,40 +271,6 @@ fun MapTopControls(
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            // Map Type Selector
-            Card(
-                modifier = Modifier.shadow(4.dp, RoundedCornerShape(12.dp)),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(modifier = Modifier.padding(4.dp)) {
-                    MapType.values().forEach { type ->
-                        val isSelected = currentMapType == type
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.primary
-                                    else Color.Transparent
-                                )
-                                .clickable { onMapTypeChange(type) }
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = type.displayName,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary
-                                else MaterialTheme.colorScheme.onSurface,
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    }
-                }
-            }
-
             // My Location Button
             FloatingActionButton(
                 onClick = { onLocationToggle(!showMyLocation) },
@@ -909,7 +857,3 @@ fun StatusBadge(status: ReportStatus, compact: Boolean = false) {
 }
 
 // --- MAP TYPE ---
-enum class MapType(val displayName: String, val tileSource: ITileSource) {
-    STANDARD("Map", TileSourceFactory.MAPNIK),
-    SATELLITE("Satellite", TileSourceFactory.WIKIMEDIA)
-}
