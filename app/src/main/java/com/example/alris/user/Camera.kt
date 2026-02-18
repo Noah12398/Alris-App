@@ -128,6 +128,8 @@ fun MultiPhotoCameraScreen() {
     var location by remember { mutableStateOf<Location?>(null) }
     var hasPermissions by remember { mutableStateOf(false) }
     var isFlashEnabled by remember { mutableStateOf(false) }
+    var showUploadDialog by remember { mutableStateOf(false) }
+    var description by remember { mutableStateOf("") }
 
     val tokenManager = remember { TokenManager(context) }
     val token by tokenManager.accessTokenFlow.collectAsState(initial = null)
@@ -215,7 +217,7 @@ fun MultiPhotoCameraScreen() {
             })
     }
 
-    fun uploadPhotos() {
+    fun uploadPhotos(userDescription: String) {
         val loc = location
         Log.d("UPLOAD", "Upload initiated")
         Log.d("UPLOAD", "Photos: ${photoFiles.size}")
@@ -249,7 +251,7 @@ fun MultiPhotoCameraScreen() {
                     files = compressedFiles,
                     latitude = loc.latitude,
                     longitude = loc.longitude,
-                    description = "User report from ALRIS mobile app"
+                    description = if (userDescription.isBlank()) "User report from ALRIS mobile app" else userDescription
                 )
 
                 uploadStatus = if (success) {
@@ -341,7 +343,7 @@ fun MultiPhotoCameraScreen() {
                     enter = scaleIn() + fadeIn(), exit = scaleOut() + fadeOut()
                 ) {
                     FloatingActionButton(
-                        onClick = { uploadPhotos() },
+                        onClick = { showUploadDialog = true },
                         modifier = Modifier.size(56.dp).shadow(12.dp, CircleShape),
                         containerColor = Color(0xFF4CAF50),
                         contentColor = Color.White
@@ -361,6 +363,94 @@ fun MultiPhotoCameraScreen() {
                     Card(modifier = Modifier.size(56.dp).shadow(8.dp, CircleShape), shape = CircleShape, colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.7f))) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text("${photoFiles.size}", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (showUploadDialog) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showUploadDialog = false }) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CloudUpload,
+                        contentDescription = "Upload",
+                        tint = Color(0xFF4CAF50),
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(Color(0xFFE8F5E9), CircleShape)
+                            .padding(8.dp)
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Text(
+                        text = "Add Details",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                    
+                    Text(
+                        text = "Help authorities understand the issue better.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text("Description (Optional)") },
+                        placeholder = { Text("e.g. Broken streetlight near the park entrance...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        maxLines = 5,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF4CAF50),
+                            unfocusedBorderColor = Color.LightGray,
+                            focusedLabelColor = Color(0xFF4CAF50)
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { showUploadDialog = false },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.Gray)
+                        ) {
+                            Text("Cancel", color = Color.Gray)
+                        }
+
+                        Button(
+                            onClick = {
+                                showUploadDialog = false
+                                uploadPhotos(description)
+                                description = ""
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                        ) {
+                            Text("Upload Report")
                         }
                     }
                 }
